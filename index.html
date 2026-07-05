@@ -12,155 +12,168 @@
         .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
         canvas { width: 100%; max-height: 350px; }
         input, button { padding: 6px 10px; font-size: 16px; }
-        .result { font-size: 18px; font-weight: bold; color: #2266bb; }
+        .res-text { font-size: 18px; font-weight: bold; color: #c00; }
     </style>
 </head>
 <body>
-    <h2>迈克尔逊干涉条纹计数 & 波长计算工具</h2>
+    <h2>迈克尔逊干涉条纹波长计算工具</h2>
+
     <div class="card">
-        <h3>步骤1：上传 Phyphox 导出光强TXT文件</h3>
-        <input type="file" id="fileInput" accept=".txt">
-        <p id="tipText">请上传phyphox导出逗号分隔的光强数据文件</p>
-        <canvas id="lightChart"></canvas>
+        <h3>1. 上传Phyphox导出文件(txt/csv)</h3>
+        <input type="file" id="fileInput" accept=".txt,.csv">
+        <p>支持：空格分隔txt、逗号分隔csv（科学计数法自动识别）</p>
     </div>
 
     <div class="card">
-        <h3>步骤2：条纹统计结果</h3>
-        <p>自动识别吞吐条纹总数 N = <span id="stripeCount" class="result">0</span></p>
-    </div>
-
-    <div class="card">
-        <h3>步骤3：输入参数计算波长</h3>
+        <h3>2. 参数输入</h3>
         <label>动镜移动距离 Δd (单位：mm)：</label>
-        <input type="number" id="deltaD" step="0.001" value="0.02">
+        <input type="number" id="deltaD" step="0.001" placeholder="例如 0.05">
         <br><br>
-        <button onclick="calcWavelength()">一键计算波长</button>
-        <p>对应光波波长 λ = <span id="waveLen" class="result">0</span> nm</p>
+        <button onclick="calcAll()">开始分析计算</button>
+    </div>
+
+    <div class="card">
+        <h3>3. 计算结果</h3>
+        <p>识别条纹总数 N：<span id="peakNum" class="res-text">--</span></p>
+        <p>计算波长 λ：<span id="waveLen" class="res-text">--</span> nm</p>
+    </div>
+
+    <div class="card">
+        <h3>4. 光强曲线</h3>
+        <canvas id="chartCanvas"></canvas>
     </div>
 
 <script>
-    let chartInstance = null;
-    let totalStripe = 0;
+let timeData = [];
+let lightRaw = [];
+let chartIns = null;
 
-    // 文件上传监听
-    document.getElementById("fileInput").addEventListener("change", async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(ev) {
-            const text = ev.target.result;
-            parseData(text);
+// ========== 【修改后的文件解析函数：兼容空格、逗号分隔】 ==========
+function parseText(text) {
+    const timeArr = [];
+    const lightArr = [];
+    const lines = text.split('\n');
+    for (const line of lines) {
+        let row = line.trim();
+        // 跳过注释行、空行
+        if (!row || row.startsWith('#')) continue;
+        // 统一把逗号替换为空格，再按任意空白分割
+        row = row.replace(/,/g, ' ');
+        const parts = row.split(/\s+/);
+        if (parts.length < 2) continue;
+        const t = parseFloat(parts[0]);
+        const val = parseFloat(parts[1]);
+        if (!isNaN(t) && !isNaN(val)) {
+            timeArr.push(t);
+            lightArr.push(val);
         }
-        reader.readAsText(file);
-    })
+    }
+    return {time: timeArr, light: lightArr};
+}
 
-    // 解析phyphox txt文本
-    function parseData(text) {
-        const lines = text.split("\n");
-        let timeArr = [];
-        let lightArr = [];
-        for (let line of lines) {
-            line = line.trim();
-            // 跳过注释空行
-            if (!line || line.startsWith("#")) continue;
-            const parts = line.split(",");
-            if (parts.length < 2) continue;
-            const t = parseFloat(parts[0]);
-            const val = parseFloat(parts[1]);
-            if (!isNaN(t) && !isNaN(val)) {
-                timeArr.push(t);
-                lightArr.push(val);
+// 滑动平均平滑
+function smoothSignal(signal, window=10) {
+    const res = [];
+    const half = Math.floor(window/2);
+    const len = signal.length;
+    for(let i=0; i<len; i++){
+        let sum = 0, cnt = 0;
+        for(let j=i-half; j<=i+half; j++){
+            if(j>=0 && j<len){
+                sum += signal[j];
+                cnt++;
             }
         }
-        // 平滑降噪 + 统计条纹
-        const smoothData = smoothSignal(lightArr, 10);
-        totalStripe = countPeaks(smoothData);
-        document.getElementById("stripeCount").innerText = totalStripe;
-        // 绘制曲线
-        drawChart(timeArr, lightArr, smoothData);
+        res.push(sum / cnt);
     }
+    return res;
+}
 
-    // 滑动平均平滑（对应Python平滑函数）
-    function smoothSignal(sig, win = 10) {
-        let res = [];
-        const half = Math.floor(win / 2);
-        for (let i = 0; i < sig.length; i++) {
-            let sum = 0, cnt = 0;
-            for (let j = i - half; j <= i + half; j++) {
-                if (j >= 0 && j < sig.length) {
-                    sum += sig[j];
-                    cnt++;
+// 统计波峰数量
+function countPeaks(smoothData) {
+    let cnt = 0;
+    const diff = [];
+    for(let i=1; i<smoothData.length; i++){
+        diff.push(smoothData[i] - smoothData[i-1]);
+    }
+    for(let i=1; i<diff.length; i++){
+        if(diff[i-1] > 0 && diff[i] < 0) cnt++;
+    }
+    return cnt;
+}
+
+// 绘制曲线
+function drawChart(timeRaw, rawLight, smoothLight) {
+    const ctx = document.getElementById('chartCanvas').getContext('2d');
+    if(chartIns) chartIns.destroy();
+    chartIns = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: timeRaw,
+            datasets: [
+                {
+                    label: '原始光强',
+                    data: rawLight,
+                    borderColor: '#999',
+                    fill: false,
+                    pointRadius: 0,
+                    borderWidth: 1,
+                },
+                {
+                    label: '平滑光强',
+                    data: smoothLight,
+                    borderColor: '#f44336',
+                    fill: false,
+                    pointRadius: 0,
+                    borderWidth: 2,
                 }
-            }
-            res.push(sum / cnt);
-        }
-        return res;
-    }
-
-    // 统计波峰数量 = 条纹吞吐数
-    function countPeaks(signal) {
-        let peaks = 0;
-        const diff = [];
-        for (let i = 1; i < signal.length; i++) {
-            diff.push(signal[i] - signal[i-1]);
-        }
-        // 上升沿转下降沿 = 一个波峰
-        for (let i = 1; i < diff.length; i++) {
-            if (diff[i-1] > 0 && diff[i] < 0) {
-                peaks++;
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {title: {display:true, text:'时间 / s'}},
+                y: {title: {display:true, text:'光强值'}}
             }
         }
-        return peaks;
-    }
+    });
+}
 
-    // 绘制原始光强+平滑曲线
-    function drawChart(tList, rawList, smoothList) {
-        const ctx = document.getElementById("lightChart").getContext("2d");
-        // 销毁旧图表防止重叠
-        if (chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(ctx, {
-            type: "line",
-            data: {
-                labels: tList,
-                datasets: [
-                    {
-                        label: "原始光强",
-                        data: rawList,
-                        borderColor: "#888",
-                        fill: false,
-                        pointRadius: 0
-                    },
-                    {
-                        label: "平滑后光强",
-                        data: smoothList,
-                        borderColor: "#f44336",
-                        fill: false,
-                        pointRadius: 0,
-                        borderWidth: 2
-                    }
-                ]
-            },
-            options: {
-                scales: {
-                    x: { title: { display: true, text: "时间 / s" } },
-                    y: { title: { display: true, text: "光强值" } }
-                }
-            }
-        })
+// 主计算逻辑
+function calcAll() {
+    if(timeData.length === 0) {
+        alert("请先上传数据文件！");
+        return;
     }
+    const deltaD = parseFloat(document.getElementById('deltaD').value);
+    if(isNaN(deltaD) || deltaD <= 0) {
+        alert("请输入合法的移动距离Δd！");
+        return;
+    }
+    const smoothLight = smoothSignal(lightRaw, 10);
+    const N = countPeaks(smoothLight);
+    document.getElementById('peakNum').innerText = N;
+    // λ=2Δd/N，单位mm转nm
+    const lambdaMm = 2 * deltaD / N;
+    const lambdaNm = lambdaMm * 1e6;
+    document.getElementById('waveLen').innerText = lambdaNm.toFixed(2);
+    drawChart(timeData, lightRaw, smoothLight);
+}
 
-    // 波长计算公式 λ=2Δd/N
-    function calcWavelength() {
-        const d = parseFloat(document.getElementById("deltaD").value);
-        const N = totalStripe;
-        if (N <= 0) {
-            alert("请先上传phyphox光强数据文件！");
-            return;
-        }
-        const lamMM = (2 * d) / N;
-        const lamNM = lamMM * 1000000;
-        document.getElementById("waveLen").innerText = lamNM.toFixed(2);
+// 监听文件上传
+document.getElementById('fileInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev){
+        const text = ev.target.result;
+        const data = parseText(text);
+        timeData = data.time;
+        lightRaw = data.light;
+        alert(`读取成功，共加载 ${timeData.length} 组数据`);
     }
+    reader.readAsText(file);
+})
 </script>
 </body>
 </html>
