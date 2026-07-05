@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 手机自适应 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>迈克尔逊干涉波长计算(Phyphox光强版)</title>
+    <!-- 在线引入绘图库，无需本地文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { max-width: 800px; margin: 20px auto; padding: 0 15px; font-family: system-ui; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        canvas { width: 100%; max-height: 350px; }
+        input, button { padding: 6px 10px; font-size: 16px; }
+        .result { font-size: 18px; font-weight: bold; color: #2266bb; }
+    </style>
+</head>
+<body>
+    <h2>迈克尔逊干涉条纹计数 & 波长计算工具</h2>
+    <div class="card">
+        <h3>步骤1：上传 Phyphox 导出光强TXT文件</h3>
+        <input type="file" id="fileInput" accept=".txt">
+        <p id="tipText">请上传phyphox导出逗号分隔的光强数据文件</p>
+        <canvas id="lightChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>步骤2：条纹统计结果</h3>
+        <p>自动识别吞吐条纹总数 N = <span id="stripeCount" class="result">0</span></p>
+    </div>
+
+    <div class="card">
+        <h3>步骤3：输入参数计算波长</h3>
+        <label>动镜移动距离 Δd (单位：mm)：</label>
+        <input type="number" id="deltaD" step="0.001" value="0.02">
+        <br><br>
+        <button onclick="calcWavelength()">一键计算波长</button>
+        <p>对应光波波长 λ = <span id="waveLen" class="result">0</span> nm</p>
+    </div>
+
+<script>
+    let chartInstance = null;
+    let totalStripe = 0;
+
+    // 文件上传监听
+    document.getElementById("fileInput").addEventListener("change", async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            const text = ev.target.result;
+            parseData(text);
+        }
+        reader.readAsText(file);
+    })
+
+    // 解析phyphox txt文本
+    function parseData(text) {
+        const lines = text.split("\n");
+        let timeArr = [];
+        let lightArr = [];
+        for (let line of lines) {
+            line = line.trim();
+            // 跳过注释空行
+            if (!line || line.startsWith("#")) continue;
+            const parts = line.split(",");
+            if (parts.length < 2) continue;
+            const t = parseFloat(parts[0]);
+            const val = parseFloat(parts[1]);
+            if (!isNaN(t) && !isNaN(val)) {
+                timeArr.push(t);
+                lightArr.push(val);
+            }
+        }
+        // 平滑降噪 + 统计条纹
+        const smoothData = smoothSignal(lightArr, 10);
+        totalStripe = countPeaks(smoothData);
+        document.getElementById("stripeCount").innerText = totalStripe;
+        // 绘制曲线
+        drawChart(timeArr, lightArr, smoothData);
+    }
+
+    // 滑动平均平滑（对应Python平滑函数）
+    function smoothSignal(sig, win = 10) {
+        let res = [];
+        const half = Math.floor(win / 2);
+        for (let i = 0; i < sig.length; i++) {
+            let sum = 0, cnt = 0;
+            for (let j = i - half; j <= i + half; j++) {
+                if (j >= 0 && j < sig.length) {
+                    sum += sig[j];
+                    cnt++;
+                }
+            }
+            res.push(sum / cnt);
+        }
+        return res;
+    }
+
+    // 统计波峰数量 = 条纹吞吐数
+    function countPeaks(signal) {
+        let peaks = 0;
+        const diff = [];
+        for (let i = 1; i < signal.length; i++) {
+            diff.push(signal[i] - signal[i-1]);
+        }
+        // 上升沿转下降沿 = 一个波峰
+        for (let i = 1; i < diff.length; i++) {
+            if (diff[i-1] > 0 && diff[i] < 0) {
+                peaks++;
+            }
+        }
+        return peaks;
+    }
+
+    // 绘制原始光强+平滑曲线
+    function drawChart(tList, rawList, smoothList) {
+        const ctx = document.getElementById("lightChart").getContext("2d");
+        // 销毁旧图表防止重叠
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: tList,
+                datasets: [
+                    {
+                        label: "原始光强",
+                        data: rawList,
+                        borderColor: "#888",
+                        fill: false,
+                        pointRadius: 0
+                    },
+                    {
+                        label: "平滑后光强",
+                        data: smoothList,
+                        borderColor: "#f44336",
+                        fill: false,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    x: { title: { display: true, text: "时间 / s" } },
+                    y: { title: { display: true, text: "光强值" } }
+                }
+            }
+        })
+    }
+
+    // 波长计算公式 λ=2Δd/N
+    function calcWavelength() {
+        const d = parseFloat(document.getElementById("deltaD").value);
+        const N = totalStripe;
+        if (N <= 0) {
+            alert("请先上传phyphox光强数据文件！");
+            return;
+        }
+        const lamMM = (2 * d) / N;
+        const lamNM = lamMM * 1000000;
+        document.getElementById("waveLen").innerText = lamNM.toFixed(2);
+    }
+</script>
+</body>
+</html>
