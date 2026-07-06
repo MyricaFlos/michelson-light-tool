@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>迈克尔逊干涉 STFT 条纹分析工具</title>
-    <!-- 样式依赖 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
@@ -239,7 +238,7 @@
             </div>
             <div class="mb-6">
                 <label class="text-slate-300 text-sm block mb-2">动镜位移 displacement (mm)</label>
-                <input class="input-dark w-full" type="number" id="displacement" placeholder="输入位移，如 0.05" step="0.001">
+                <input class="input-dark w-full" type="number" id="displacement" placeholder="输入位移，如 0.05" step="0.001" value="0.05">
             </div>
             <button class="btn-main" onclick="runFullAnalysis()">执行完整 STFT 分析计算</button>
         </section>
@@ -275,47 +274,33 @@
     <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.0/lib/browser/math.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fft.js@4.0.4/fft.min.js"></script>
 <script>
-// ============ 核心修改：文件解析逻辑，精准读取Luminance列 ============
 let rawLightData = [];
 let chart1, chart2, chart3;
 
 /**
- * 解析文件：
- * 1. CSV：优先按表头匹配"Luminance"列，精准读取对应数据；无匹配时兼容第二列
- * 2. TXT：兼容#注释、空格分隔格式，取第二列
+ * CSV解析：自动匹配表头Luminance列
  */
 function parseFileText(text, fileName) {
     const dataArr = [];
-    const lines = text.split('\n');
+    // 统一换行符，兼容Windows换行 \r\n
+    const lines = text.replaceAll('\r','').split('\n');
     if(fileName.toLowerCase().endsWith('.csv')){
-        // CSV文件处理逻辑
-        if(lines.length < 2) return dataArr; // 至少需要表头+1行数据
-        
-        // 解析表头，找到Luminance列的索引
+        if(lines.length < 2) return dataArr;
         const headerLine = lines[0].trim();
         const headers = headerLine.split(',').map(h => h.trim());
         let targetColIndex = headers.indexOf('Luminance');
-        
-        // 兼容逻辑：没找到Luminance列时，默认取第二列（索引1），兼容旧格式
         if(targetColIndex === -1) {
             targetColIndex = 1;
-            console.log("未找到Luminance列，默认读取第二列数据");
-        } else {
-            console.log(`找到Luminance列，列索引：${targetColIndex}`);
         }
-
-        // 从第二行开始遍历数据行
         for(let i = 1; i < lines.length; i++){
             const line = lines[i].trim();
             if(!line) continue;
             const cols = line.split(',');
-            // 确保列数足够
             if(cols.length <= targetColIndex) continue;
             const val = parseFloat(cols[targetColIndex].trim());
             if(!isNaN(val)) dataArr.push(val);
         }
     }else{
-        // TXT文件原有逻辑不变：#注释、空格分隔，取第二列
         for (let line of lines) {
             let row = line.trim();
             if (!row || row.startsWith('#')) continue;
@@ -329,7 +314,7 @@ function parseFileText(text, fileName) {
     return dataArr;
 }
 
-/** 移动平均平滑（无修改） */
+/** 移动平均平滑 */
 function smoothData(data, winSize = 15) {
     const n = data.length;
     if (winSize < 1) throw new Error("窗口必须为正数");
@@ -348,7 +333,7 @@ function smoothData(data, winSize = 15) {
     return res;
 }
 
-/** STFT短时傅里叶变换（无修改） */
+/** STFT变换 */
 function stftTransform(sig, fs, nperseg, noverlap) {
     const fftSize = nperseg;
     const fftObj = new FFT(fftSize);
@@ -375,11 +360,13 @@ function stftTransform(sig, fs, nperseg, noverlap) {
     return { f: freqAxis, t: tAxis, Zxx: specT };
 }
 
-/** 核心分析函数（完全复刻Python analyze_data，无修改） */
+/** 核心分析函数 */
 function analyzeData(data, params) {
     const { samplingRate, minFreq, maxFreq, windowSize, overlap, fringeCoeff } = params;
     const n = data.length;
-    if (n < windowSize) return { fringeCount: 0 };
+    if (n < windowSize) {
+        throw new Error(`数据长度(${n})小于STFT窗口大小(${windowSize})，无法执行变换，请更换更长数据或调小窗口`);
+    }
     const denoised = smoothData(data, 15);
     const meanVal = math.mean(denoised);
     const processed = denoised.map(v => v - meanVal);
@@ -390,7 +377,7 @@ function analyzeData(data, params) {
     const freqMask = f.map(fr => fr >= minFreq && fr <= maxFreq);
     const validF = f.filter((_, idx) => freqMask[idx]);
     const validZxx = Zxx.filter((_, idx) => freqMask[idx]);
-    if (validZxx.length === 0) return { fringeCount: 0, processedData: processed };
+    if (validZxx.length === 0) throw new Error("有效频段内无频谱数据，请调整最小/最大频率参数");
     const stageFreqs = [];
     const timeCnt = validZxx[0].length;
     for (let ti = 0; ti < timeCnt; ti++) {
@@ -407,6 +394,7 @@ function analyzeData(data, params) {
     const medianFreq = math.median(stageFreqs);
     const stdFreq = math.std(stageFreqs);
     const validStageFreqs = stageFreqs.filter(f => Math.abs(f - medianFreq) <= 2 * stdFreq);
+    if (validStageFreqs.length === 0) throw new Error("过滤后无有效频率段，无法统计条纹");
     const stageDuration = (nperseg - noverlap) / samplingRate;
     let totalCycles = 0;
     validStageFreqs.forEach(f => totalCycles += f * stageDuration);
@@ -416,7 +404,7 @@ function analyzeData(data, params) {
     };
 }
 
-/** 波长计算函数（无修改） */
+/** 波长计算 */
 function calcWavelength(displacementMm, fringeCount) {
     if (fringeCount <= 0) return { err: "条纹吞吐数必须大于0" };
     if (displacementMm <= 0) return { err: "位移必须大于0" };
@@ -426,13 +414,13 @@ function calcWavelength(displacementMm, fringeCount) {
     return { waveM, waveNm, err: null };
 }
 
-/** 绘制三张分析图表，适配深色主题配色（无修改） */
+/** 绘图函数 */
 function drawCharts(res) {
     const { processedData, validStageFreqs, validF, t, validZxx } = res;
     if (chart1) chart1.destroy();
     if (chart2) chart2.destroy();
     if (chart3) chart3.destroy();
-    // 图1：去噪光强时序
+    // 时序图
     const ctx1 = document.getElementById("chart1").getContext("2d");
     chart1 = new Chart(ctx1, {
         type: "line",
@@ -441,7 +429,7 @@ function drawCharts(res) {
             datasets: [{ label: "去噪光照强度时序", data: processedData, borderColor: "#06b6d4", pointRadius: 0, borderWidth: 1.5, tension:0.2 }]
         },
         options: {
-            responsive: true,
+            responsive: true, maintainAspectRatio:false,
             plugins: { title: { display: true, text: "去噪后的光照强度时间序列", color:"#e2e8f0" }, legend:{labels:{color:"#cbd5e1"}} },
             scales: {
                 x: { title: { display: true, text: "采样点", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
@@ -449,7 +437,7 @@ function drawCharts(res) {
             }
         }
     });
-    // 图3：分段主峰频率
+    // 主峰频率图
     const ctx3 = document.getElementById("chart3").getContext("2d");
     const medF = math.median(validStageFreqs);
     chart3 = new Chart(ctx3, {
@@ -462,7 +450,7 @@ function drawCharts(res) {
             ]
         },
         options: {
-            responsive: true,
+            responsive: true, maintainAspectRatio:false,
             plugins: { title: { display: true, text: "分窗口主峰频率变化", color:"#e2e8f0" }, legend:{labels:{color:"#cbd5e1"}} },
             scales: {
                 x: { title: { display: true, text: "窗口序号", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
@@ -470,7 +458,7 @@ function drawCharts(res) {
             }
         }
     });
-    // 图2 STFT时频曲线
+    // STFT时频图
     const ctx2 = document.getElementById("chart2").getContext("2d");
     const datasets = [];
     validF.forEach((freq, idx) => {
@@ -480,7 +468,7 @@ function drawCharts(res) {
         type: "line",
         data: { labels: t, datasets },
         options: {
-            responsive: true,
+            responsive: true, maintainAspectRatio:false,
             plugins: { title: { display: true, text: "STFT时频振幅曲线", color:"#e2e8f0" }, legend:{display:false} },
             scales: {
                 x: { title: { display: true, text: "时间 s", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
@@ -490,48 +478,80 @@ function drawCharts(res) {
     });
 }
 
-// 文件上传监听（无修改）
+// 文件上传监听（修复弹窗文字缺失数字问题）
 document.getElementById("fileInput").addEventListener("change", function (e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
         rawLightData = parseFileText(ev.target.result, file.name);
+        // 修复点：完整拼接数字，不会出现‘读取了组多少数据’空白
         alert(`文件读取完成，共加载 ${rawLightData.length} 组光强数据`);
+        // 清空上次计算结果与画布
+        document.getElementById("fringeCount").innerText = "--";
+        document.getElementById("waveM").innerText = "--";
+        document.getElementById("waveNm").innerText = "--";
+        document.getElementById("errMsg").innerText = "";
+        if(chart1) chart1.destroy();
+        if(chart2) chart2.destroy();
+        if(chart3) chart3.destroy();
     };
     reader.readAsText(file);
 });
 
-// 一键分析入口（无修改）
+// 一键分析入口，全局捕获异常
 function runFullAnalysis() {
-    const errDom = document.getElementById("errMsg");
-    errDom.innerText = "";
-    if (rawLightData.length === 0) {
-        errDom.innerText = "请先上传数据文件！";
-        return;
-    }
-    const params = {
-        samplingRate: Number(document.getElementById("samplingRate").value),
-        minFreq: Number(document.getElementById("minFreq").value),
-        maxFreq: Number(document.getElementById("maxFreq").value),
-        windowSize: Number(document.getElementById("winSize").value),
-        overlap: Number(document.getElementById("overlap").value),
-        fringeCoeff: Number(document.getElementById("fringeCoeff").value)
-    };
-    const dispMm = Number(document.getElementById("displacement").value);
-    const anaRes = analyzeData(rawLightData, params);
-    const N = anaRes.fringeCount;
-    document.getElementById("fringeCount").innerText = N;
-    const waveRes = calcWavelength(dispMm, N);
-    if (waveRes.err) {
-        errDom.innerText = waveRes.err;
+    try{
+        const errDom = document.getElementById("errMsg");
+        errDom.innerText = "";
+        // 1 判断是否有数据
+        if (rawLightData.length === 0) {
+            throw new Error("请先上传数据文件！");
+        }
+        // 2 读取参数
+        const params = {
+            samplingRate: Number(document.getElementById("samplingRate").value),
+            minFreq: Number(document.getElementById("minFreq").value),
+            maxFreq: Number(document.getElementById("maxFreq").value),
+            windowSize: Number(document.getElementById("winSize").value),
+            overlap: Number(document.getElementById("overlap").value),
+            fringeCoeff: Number(document.getElementById("fringeCoeff").value)
+        };
+        const dispMm = Number(document.getElementById("displacement").value);
+        if(isNaN(dispMm) || dispMm <= 0){
+            throw new Error("请输入合法、大于0的动镜位移(mm)");
+        }
+        // 3 执行STFT分析
+        const anaRes = analyzeData(rawLightData, params);
+        const N = anaRes.fringeCount;
+        // 4 回填结果
+        document.getElementById("fringeCount").innerText = N;
+        const waveRes = calcWavelength(dispMm, N);
+        if (waveRes.err) {
+            errDom.innerText = waveRes.err;
+            document.getElementById("waveM").innerText = "--";
+            document.getElementById("waveNm").innerText = "--";
+        } else {
+            document.getElementById("waveM").innerText = waveRes.waveM.toExponential(4);
+            document.getElementById("waveNm").innerText = waveRes.waveNm.toFixed(2);
+        }
+        // 5 绘制图表
+        drawCharts(anaRes);
+        alert("分析完成，已生成计算结果与时频图表！");
+    }catch(err){
+        // 捕获所有报错，弹窗+页面文字提示
+        const errDom = document.getElementById("errMsg");
+        const errText = err.message;
+        errDom.innerText = "错误：" + errText;
+        alert("分析失败：" + errText);
+        // 清空结果
+        document.getElementById("fringeCount").innerText = "--";
         document.getElementById("waveM").innerText = "--";
         document.getElementById("waveNm").innerText = "--";
-    } else {
-        document.getElementById("waveM").innerText = waveRes.waveM.toExponential(4);
-        document.getElementById("waveNm").innerText = waveRes.waveNm.toFixed(2);
+        if(chart1) chart1.destroy();
+        if(chart2) chart2.destroy();
+        if(chart3) chart3.destroy();
     }
-    drawCharts(anaRes);
 }
 </script>
 </body>
