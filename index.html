@@ -3,215 +3,315 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>迈克尔逊干涉条纹分析</title>
-    <!-- 依赖库 -->
+    <title>迈克尔逊干涉 STFT 条纹分析工具</title>
+    <!-- 样式依赖 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: #0a0e1a;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
+            color: #e2e8f0;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        body > * {
+            position: relative;
+            z-index: 1;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #06b6d4, #3b82f6);
+            border-radius: 4px;
+        }
+        ::selection {
+            background: rgba(6, 182, 212, 0.3);
+            color: #fff;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.35s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(6, 182, 212, 0.12);
+            border-color: rgba(6, 182, 212, 0.25);
+        }
+        .gradient-border {
+            position: relative;
+        }
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6, #8b5cf6);
+            background-size: 200% 200%;
+            animation: gradientFlow 8s ease infinite;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+        @keyframes gradientFlow {
+            0%,100% {background-position:0% 50%;}
+            50% {background-position:100% 50%;}
+        }
+        .glow-text {
+            text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+        .section-title {
+            position: relative;
+            padding-left: 16px;
+        }
+        .section-title::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 70%;
+            background: linear-gradient(180deg, #06b6d4, #3b82f6);
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #1e293b;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+            transition: 0.2s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            box-shadow: 0 0 16px rgba(6, 182, 212, 0.8);
+        }
+        .input-dark {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            outline: none;
+            transition: 0.2s;
+        }
+        .input-dark:focus {
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+        }
+        .btn-main {
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            color: white;
+            padding: 12px 28px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 500;
+            transition: 0.25s;
+        }
+        .btn-main:hover {
+            box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
+            transform: translateY(-2px);
+        }
+        .btn-main:active {
+            transform: scale(0.98);
+        }
+        .result-block {
+            background: rgba(15, 23, 42, 0.5);
+            border-left: 3px solid #06b6d4;
+            padding: 18px 22px;
+            border-radius: 0 10px 10px 0;
+        }
+        .result-value {
+            color: #06e0f0;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .chart-wrap {
+            background: radial-gradient(circle, #0f172a 0%, #020617 100%);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
+        }
+        @keyframes fadeUp {
+            from {opacity:0;transform: translateY(20px);}
+            to {opacity:1;transform: translateY(0);}
+        }
+        .fade-animate {
+            animation: fadeUp 0.7s ease forwards;
+            opacity: 0;
+        }
+        .delay-1 {animation-delay: 0.1s;}
+        .delay-2 {animation-delay: 0.25s;}
+        .delay-3 {animation-delay: 0.4s;}
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+    <!-- 头部标题区 -->
+    <header class="relative py-14 px-6 text-center overflow-hidden fade-animate">
+        <div class="absolute inset-0 opacity-20">
+            <div class="absolute top-8 left-1/4 w-60 h-60 rounded-full bg-cyan-500 blur-3xl animate-pulse"></div>
+            <div class="absolute bottom-0 right-1/4 w-72 h-72 rounded-full bg-blue-600 blur-3xl animate-pulse" style="animation-delay:1s"></div>
+        </div>
+        <div class="relative z-10">
+            <p class="text-cyan-400 text-sm tracking-widest mb-3">PHYPHOS 光强数据 · STFT分析工具</p>
+            <h1 class="text-4xl md:text-5xl font-bold glow-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
+                迈克尔逊干涉 STFT 条纹分析工具
+            </h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                直接上传Phyphox原生CSV/TXT，自动识别Luminance列，短时傅里叶变换提取干涉条纹，计算激光波长
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 space-y-10">
+        <!-- 1 文件上传模块 -->
+        <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-1">
+            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">1. 上传光强数据文件</h2>
+            <input class="input-dark w-full" type="file" id="fileInput" accept=".txt,.csv">
+            <p class="text-slate-400 text-sm mt-3">支持：Phyphox原生多列CSV（自动识别Luminance列）、空格分隔TXT；兼容科学计数法</p>
+        </section>
+
+        <!-- 2 参数配置模块 -->
+        <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-2">
+            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">2. 算法参数配置（默认与Python源码对齐）</h2>
+            <div class="grid md:grid-cols-2 gap-5 mb-4">
+                <div>
+                    <label class="text-slate-300 text-sm block mb-2">采样率 sampling_rate (Hz)</label>
+                    <input class="input-dark w-full" type="number" id="samplingRate" value="100" step="1">
+                </div>
+                <div>
+                    <label class="text-slate-300 text-sm block mb-2">最小有效频率 min_freq (Hz)</label>
+                    <input class="input-dark w-full" type="number" id="minFreq" value="0.1" step="0.01">
+                </div>
+                <div>
+                    <label class="text-slate-300 text-sm block mb-2">最大有效频率 max_freq (Hz)</label>
+                    <input class="input-dark w-full" type="number" id="maxFreq" value="5.0" step="0.01">
+                </div>
+                <div>
+                    <label class="text-slate-300 text-sm block mb-2">STFT窗口 window_size</label>
+                    <input class="input-dark w-full" type="number" id="winSize" value="256" step="16">
+                </div>
+                <div>
+                    <label class="text-slate-300 text-sm block mb-2">窗口重叠 overlap</label>
+                    <input class="input-dark w-full" type="number" id="overlap" value="0.5" step="0.05" min="0" max="0.95">
+                </div>
+                <div>
+                    <label class="text-slate-300 text-sm block mb-2">条纹修正系数 fringe_coeff</label>
+                    <input class="input-dark w-full" type="number" id="fringeCoeff" value="1.15" step="0.01">
+                </div>
+            </div>
+            <div class="mb-6">
+                <label class="text-slate-300 text-sm block mb-2">动镜位移 displacement (mm)</label>
+                <input class="input-dark w-full" type="number" id="displacement" placeholder="输入位移，如 0.05" step="0.001">
+            </div>
+            <button class="btn-main" onclick="runFullAnalysis()">执行完整 STFT 分析计算</button>
+        </section>
+
+        <!-- 3 计算结果模块 -->
+        <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-2">
+            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">3. 计算结果</h2>
+            <div class="result-block">
+                <p class="text-slate-300 text-base my-3">识别总条纹数 N：<span class="result-value" id="fringeCount">--</span></p>
+                <p class="text-slate-300 text-base my-3">波长 λ (米)：<span class="result-value" id="waveM">--</span></p>
+                <p class="text-slate-300 text-base my-3">波长 λ (纳米)：<span class="result-value" id="waveNm">--</span></p>
+                <p id="errMsg" class="text-red-400 text-sm mt-2"></p>
+            </div>
+        </section>
+
+        <!-- 4 可视化图表模块 -->
+        <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-3">
+            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">4. 分析可视化曲线</h2>
+            <div class="chart-wrap mb-6">
+                <canvas id="chart1"></canvas>
+            </div>
+            <div class="chart-wrap mb-6">
+                <canvas id="chart2"></canvas>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="chart3"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <!-- JS依赖 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.0/lib/browser/math.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fft.js@4.0.4/fft.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            max-width: 900px;
-            margin: 30px auto;
-            padding: 0 20px;
-            font-family: "Microsoft YaHei", system-ui, sans-serif;
-            background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 100%);
-            min-height: 100vh;
-        }
-        h2 {
-            text-align: center;
-            color: #4a439b;
-            margin-bottom: 30px;
-            font-size: 26px;
-        }
-        h3 {
-            color: #1a5b9e;
-            margin-bottom: 16px;
-            border-left: 4px solid #297acc;
-            padding-left: 12px;
-            font-size: 20px;
-        }
-        .card {
-            background: #fff;
-            border-radius: 14px;
-            padding: 24px;
-            margin-bottom: 22px;
-            box-shadow: 0 4px 14px rgba(41, 122, 204, 0.12);
-            transition: 0.3s;
-        }
-        .card:hover {
-            box-shadow: 0 6px 20px rgba(41, 122, 204, 0.18);
-            transform: translateY(-2px);
-        }
-        .grid-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin: 12px 0;
-        }
-        label {
-            font-weight: 500;
-            color: #222;
-            display: block;
-            margin-bottom: 6px;
-        }
-        input[type="file"], input[type="number"] {
-            width: 100%;
-            padding: 9px 12px;
-            border: 1px solid #b8d4f0;
-            border-radius: 8px;
-            font-size: 16px;
-            outline: none;
-        }
-        input:focus {
-            border-color: #297acc;
-            box-shadow: 0 0 0 3px rgba(41, 122, 204, 0.15);
-        }
-        button {
-            padding: 11px 26px;
-            background: #297acc;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: 0.25s;
-        }
-        button:hover {
-            background: #1d68b8;
-            box-shadow: 0 4px 12px rgba(41, 122, 204, 0.3);
-        }
-        button:active {
-            transform: scale(0.97);
-        }
-        .res-block {
-            background: #f0f7ff;
-            padding: 16px;
-            border-radius: 10px;
-            margin-top: 12px;
-        }
-        .res-item {
-            font-size: 17px;
-            margin: 8px 0;
-        }
-        .res-value {
-            font-weight: bold;
-            color: #c02929;
-            background: #ffeaea;
-            padding: 3px 10px;
-            border-radius: 6px;
-            margin-left: 8px;
-        }
-        canvas {
-            width: 100%;
-            margin-top: 10px;
-            max-height: 320px;
-        }
-        .tip {
-            font-size: 14px;
-            color: #555;
-            margin-top: 6px;
-        }
-    </style>
-</head>
-<body>
-    <h2>迈克尔逊干涉条纹分析</h2>
-
-    <!-- 1 文件上传 -->
-    <div class="card">
-        <h3>1. 上传光强数据文件</h3>
-        <input type="file" id="fileInput" accept=".txt,.csv">
-        <p class="tip">支持：Phyphox直接导出原生CSV（无需修改）、空格分隔TXT；自动跳过表头，仅提取第二列照度数据</p>
-    </div>
-
-    <!-- 2 算法参数配置（与Python代码默认值对齐） -->
-    <div class="card">
-        <h3>2. 算法参数配置（默认与Python代码一致）</h3>
-        <div class="grid-row">
-            <div>
-                <label>采样率 sampling_rate (Hz)</label>
-                <input type="number" id="samplingRate" value="100" step="1">
-            </div>
-            <div>
-                <label>最小有效频率 min_freq (Hz)</label>
-                <input type="number" id="minFreq" value="0.1" step="0.01">
-            </div>
-        </div>
-        <div class="grid-row">
-            <div>
-                <label>最大有效频率 max_freq (Hz)</label>
-                <input type="number" id="maxFreq" value="5.0" step="0.01">
-            </div>
-            <div>
-                <label>STFT窗口 window_size</label>
-                <input type="number" id="winSize" value="256" step="16">
-            </div>
-        </div>
-        <div class="grid-row">
-            <div>
-                <label>窗口重叠 overlap</label>
-                <input type="number" id="overlap" value="0.5" step="0.05" min="0" max="0.95">
-            </div>
-            <div>
-                <label>条纹修正系数 fringe_coeff</label>
-                <input type="number" id="fringeCoeff" value="1.15" step="0.01">
-            </div>
-        </div>
-        <div style="margin-top:16px">
-            <label>动镜位移 displacement (mm)</label>
-            <input type="number" id="displacement" placeholder="输入位移，如0.05" step="0.001">
-        </div>
-        <div style="margin-top:20px">
-            <button onclick="runFullAnalysis()">执行完整STFT分析计算</button>
-        </div>
-    </div>
-
-    <!-- 3 计算结果输出 -->
-    <div class="card">
-        <h3>3. 计算结果</h3>
-        <div class="res-block">
-            <p class="res-item">识别总条纹数 N：<span class="res-value" id="fringeCount">--</span></p>
-            <p class="res-item">波长 λ (米)：<span class="res-value" id="waveM">--</span></p>
-            <p class="res-item">波长 λ (纳米)：<span class="res-value" id="waveNm">--</span></p>
-            <p class="res-item" id="errMsg" style="color:#c02929"></p>
-        </div>
-    </div>
-
-    <!-- 4 可视化三张图 -->
-    <div class="card">
-        <h3>4. 分析可视化曲线</h3>
-        <canvas id="chart1"></canvas>
-        <canvas id="chart2"></canvas>
-        <canvas id="chart3"></canvas>
-    </div>
-
 <script>
-// 全局存储数据
+// ============ 核心修改：文件解析逻辑，精准读取Luminance列 ============
 let rawLightData = [];
 let chart1, chart2, chart3;
 
-// ====================== 工具函数（新增CSV原生解析，复刻csv_to_binary逻辑） ======================
 /**
  * 解析文件：
- * 1. .csv：复刻Python csv_to_binary逻辑，skip_header=1跳过表头，提取第二列照度
- * 2. .txt：兼容#注释、空格分隔格式
+ * 1. CSV：优先按表头匹配"Luminance"列，精准读取对应数据；无匹配时兼容第二列
+ * 2. TXT：兼容#注释、空格分隔格式，取第二列
  */
 function parseFileText(text, fileName) {
     const dataArr = [];
     const lines = text.split('\n');
-    // 判断是否为CSV文件（后缀.csv）
     if(fileName.toLowerCase().endsWith('.csv')){
-        // 复刻 np.genfromtxt(delimiter=',', skip_header=1)
+        // CSV文件处理逻辑
+        if(lines.length < 2) return dataArr; // 至少需要表头+1行数据
+        
+        // 解析表头，找到Luminance列的索引
+        const headerLine = lines[0].trim();
+        const headers = headerLine.split(',').map(h => h.trim());
+        let targetColIndex = headers.indexOf('Luminance');
+        
+        // 兼容逻辑：没找到Luminance列时，默认取第二列（索引1），兼容旧格式
+        if(targetColIndex === -1) {
+            targetColIndex = 1;
+            console.log("未找到Luminance列，默认读取第二列数据");
+        } else {
+            console.log(`找到Luminance列，列索引：${targetColIndex}`);
+        }
+
+        // 从第二行开始遍历数据行
         for(let i = 1; i < lines.length; i++){
             const line = lines[i].trim();
             if(!line) continue;
             const cols = line.split(',');
-            // 取第二列（索引1）照度值，对应illuminance = data[:,1]
-            const val = parseFloat(cols[1]);
+            // 确保列数足够
+            if(cols.length <= targetColIndex) continue;
+            const val = parseFloat(cols[targetColIndex].trim());
             if(!isNaN(val)) dataArr.push(val);
         }
     }else{
@@ -229,9 +329,7 @@ function parseFileText(text, fileName) {
     return dataArr;
 }
 
-/**
- * 移动平均平滑 smooth_data(win_size=15)
- */
+/** 移动平均平滑（无修改） */
 function smoothData(data, winSize = 15) {
     const n = data.length;
     if (winSize < 1) throw new Error("窗口必须为正数");
@@ -250,9 +348,7 @@ function smoothData(data, winSize = 15) {
     return res;
 }
 
-/**
- * STFT 短时傅里叶变换复刻
- */
+/** STFT短时傅里叶变换（无修改） */
 function stftTransform(sig, fs, nperseg, noverlap) {
     const fftSize = nperseg;
     const fftObj = new FFT(fftSize);
@@ -260,20 +356,12 @@ function stftTransform(sig, fs, nperseg, noverlap) {
     const tAxis = [];
     const freqAxis = [];
     const specMatrix = [];
-
-    // 生成频率轴
-    for (let i = 0; i <= fftSize / 2; i++) {
-        freqAxis.push(i * fs / fftSize);
-    }
-
-    // 滑动分窗计算FFT
+    for (let i = 0; i <= fftSize / 2; i++) freqAxis.push(i * fs / fftSize);
     for (let start = 0; start + nperseg <= sig.length; start += step) {
         const winSig = sig.slice(start, start + nperseg);
         const out = new Array(fftSize * 2).fill(0);
-        // 填充实部
         for (let i = 0; i < nperseg; i++) out[2 * i] = winSig[i];
         fftObj.transform(out);
-        // 取单边振幅
         const amp = [];
         for (let i = 0; i <= fftSize / 2; i++) {
             const real = out[2 * i];
@@ -283,38 +371,26 @@ function stftTransform(sig, fs, nperseg, noverlap) {
         specMatrix.push(amp);
         tAxis.push(start / fs);
     }
-    // 转置矩阵 [freq][time]
     const specT = math.transpose(specMatrix);
     return { f: freqAxis, t: tAxis, Zxx: specT };
 }
 
-/**
- * 核心分析函数 analyze_data 1:1复刻Python
- */
+/** 核心分析函数（完全复刻Python analyze_data，无修改） */
 function analyzeData(data, params) {
     const { samplingRate, minFreq, maxFreq, windowSize, overlap, fringeCoeff } = params;
     const n = data.length;
     if (n < windowSize) return { fringeCount: 0 };
-
-    // 1 平滑去噪
     const denoised = smoothData(data, 15);
-    // 2 去直流分量
     const meanVal = math.mean(denoised);
     const processed = denoised.map(v => v - meanVal);
-
-    // STFT参数
     const nperseg = windowSize;
     const noverlap = Math.floor(nperseg * overlap);
     const stftRes = stftTransform(processed, samplingRate, nperseg, noverlap);
     let { f, t, Zxx } = stftRes;
-
-    // 过滤有效频段
     const freqMask = f.map(fr => fr >= minFreq && fr <= maxFreq);
     const validF = f.filter((_, idx) => freqMask[idx]);
     const validZxx = Zxx.filter((_, idx) => freqMask[idx]);
     if (validZxx.length === 0) return { fringeCount: 0, processedData: processed };
-
-    // 取每个时间窗口峰值频率
     const stageFreqs = [];
     const timeCnt = validZxx[0].length;
     for (let ti = 0; ti < timeCnt; ti++) {
@@ -328,62 +404,52 @@ function analyzeData(data, params) {
         }
         stageFreqs.push(validF[maxFIdx]);
     }
-
-    // 剔除2倍标准差外异常频率
     const medianFreq = math.median(stageFreqs);
     const stdFreq = math.std(stageFreqs);
     const validStageFreqs = stageFreqs.filter(f => Math.abs(f - medianFreq) <= 2 * stdFreq);
-
-    // 积分计算总周期数
     const stageDuration = (nperseg - noverlap) / samplingRate;
     let totalCycles = 0;
     validStageFreqs.forEach(f => totalCycles += f * stageDuration);
     const fringeCount = Math.round(totalCycles * fringeCoeff * 100) / 100;
-
     return {
-        fringeCount,
-        validStageFreqs,
-        validF,
-        t,
-        validZxx,
-        processedData: processed
+        fringeCount, validStageFreqs, validF, t, validZxx, processedData: processed
     };
 }
 
-/**
- * 波长计算 calculate_wavelength
- */
+/** 波长计算函数（无修改） */
 function calcWavelength(displacementMm, fringeCount) {
     if (fringeCount <= 0) return { err: "条纹吞吐数必须大于0" };
     if (displacementMm <= 0) return { err: "位移必须大于0" };
-    const dM = displacementMm / 1000; // mm转米
+    const dM = displacementMm / 1000;
     const waveM = (2 * dM) / fringeCount;
     const waveNm = waveM * 1e9;
     return { waveM, waveNm, err: null };
 }
 
-/**
- * 绘制三张图表，复刻Python三张子图
- */
+/** 绘制三张分析图表，适配深色主题配色（无修改） */
 function drawCharts(res) {
     const { processedData, validStageFreqs, validF, t, validZxx } = res;
-    // 销毁旧画布
     if (chart1) chart1.destroy();
     if (chart2) chart2.destroy();
     if (chart3) chart3.destroy();
-
     // 图1：去噪光强时序
     const ctx1 = document.getElementById("chart1").getContext("2d");
     chart1 = new Chart(ctx1, {
         type: "line",
         data: {
             labels: processedData.map((_, i) => i),
-            datasets: [{ label: "去噪光照强度时序", data: processedData, borderColor: "#1d74c7", pointRadius: 0, borderWidth: 1.5 }]
+            datasets: [{ label: "去噪光照强度时序", data: processedData, borderColor: "#06b6d4", pointRadius: 0, borderWidth: 1.5, tension:0.2 }]
         },
-        options: { responsive: true, plugins: { title: { display: true, text: "去噪后的光照强度时间序列" } }, scales: { x: { title: { display: true, text: "采样点" } }, y: { title: { display: true, text: "强度值" } } }
+        options: {
+            responsive: true,
+            plugins: { title: { display: true, text: "去噪后的光照强度时间序列", color:"#e2e8f0" }, legend:{labels:{color:"#cbd5e1"}} },
+            scales: {
+                x: { title: { display: true, text: "采样点", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
+                y: { title: { display: true, text: "强度值", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} }
+            }
+        }
     });
-
-    // 图3：分段主频率变化
+    // 图3：分段主峰频率
     const ctx3 = document.getElementById("chart3").getContext("2d");
     const medF = math.median(validStageFreqs);
     chart3 = new Chart(ctx3, {
@@ -391,28 +457,40 @@ function drawCharts(res) {
         data: {
             labels: validStageFreqs.map((_, i) => i),
             datasets: [
-                { label: "各窗口主峰频率", data: validStageFreqs, borderColor: "#0051ba", pointRadius: 0 },
-                { label: `平均频率 ${medF.toFixed(2)}Hz`, data: validStageFreqs.map(() => medF), borderColor: "#d62828", borderDash: [5, 5], pointRadius: 0 }
+                { label: "各窗口主峰频率", data: validStageFreqs, borderColor: "#3b82f6", pointRadius: 0, tension:0.2 },
+                { label: `平均频率 ${medF.toFixed(2)}Hz`, data: validStageFreqs.map(() => medF), borderColor: "#ff8a3d", borderDash: [5,5], pointRadius:0 }
             ]
         },
-        options: { responsive: true, plugins: { title: { display: true, text: "分窗口主峰频率变化" } }, scales: { x: { title: { display: true, text: "窗口序号" } }, y: { title: { display: true, text: "频率 Hz" } } }
+        options: {
+            responsive: true,
+            plugins: { title: { display: true, text: "分窗口主峰频率变化", color:"#e2e8f0" }, legend:{labels:{color:"#cbd5e1"}} },
+            scales: {
+                x: { title: { display: true, text: "窗口序号", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
+                y: { title: { display: true, text: "频率 Hz", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} }
+            }
+        }
     });
-
     // 图2 STFT时频曲线
     const ctx2 = document.getElementById("chart2").getContext("2d");
     const datasets = [];
     validF.forEach((freq, idx) => {
-        datasets.push({ label: `${freq.toFixed(2)}Hz`, data: validZxx[idx], borderWidth: 1, pointRadius: 0 });
+        datasets.push({ label: `${freq.toFixed(2)}Hz`, data: validZxx[idx], borderWidth: 1, pointRadius: 0, tension:0.2, borderColor: idx%2?"#60a5fa":"#22d3ee" });
     });
     chart2 = new Chart(ctx2, {
         type: "line",
         data: { labels: t, datasets },
-        options: { responsive: true, plugins: { title: { display: true, text: "STFT时频振幅曲线" } }, scales: { x: { title: { display: true, text: "时间 s" } }, y: { title: { display: true, text: "振幅" } } }
+        options: {
+            responsive: true,
+            plugins: { title: { display: true, text: "STFT时频振幅曲线", color:"#e2e8f0" }, legend:{display:false} },
+            scales: {
+                x: { title: { display: true, text: "时间 s", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
+                y: { title: { display: true, text: "振幅", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} }
+            }
+        }
     });
 }
 
-// ====================== 页面交互逻辑 ======================
-// 文件读取监听（传递文件名区分CSV/TXT）
+// 文件上传监听（无修改）
 document.getElementById("fileInput").addEventListener("change", function (e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -424,7 +502,7 @@ document.getElementById("fileInput").addEventListener("change", function (e) {
     reader.readAsText(file);
 });
 
-// 一键完整分析入口
+// 一键分析入口（无修改）
 function runFullAnalysis() {
     const errDom = document.getElementById("errMsg");
     errDom.innerText = "";
@@ -432,7 +510,6 @@ function runFullAnalysis() {
         errDom.innerText = "请先上传数据文件！";
         return;
     }
-    // 读取页面参数
     const params = {
         samplingRate: Number(document.getElementById("samplingRate").value),
         minFreq: Number(document.getElementById("minFreq").value),
@@ -442,11 +519,9 @@ function runFullAnalysis() {
         fringeCoeff: Number(document.getElementById("fringeCoeff").value)
     };
     const dispMm = Number(document.getElementById("displacement").value);
-    // 执行STFT分析
     const anaRes = analyzeData(rawLightData, params);
     const N = anaRes.fringeCount;
     document.getElementById("fringeCount").innerText = N;
-    // 波长计算
     const waveRes = calcWavelength(dispMm, N);
     if (waveRes.err) {
         errDom.innerText = waveRes.err;
@@ -456,7 +531,6 @@ function runFullAnalysis() {
         document.getElementById("waveM").innerText = waveRes.waveM.toExponential(4);
         document.getElementById("waveNm").innerText = waveRes.waveNm.toFixed(2);
     }
-    // 绘制三张图
     drawCharts(anaRes);
 }
 </script>
