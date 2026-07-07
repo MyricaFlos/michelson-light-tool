@@ -189,7 +189,7 @@
             <div class="absolute bottom-0 right-1/4 w-72 h-72 rounded-full bg-blue-600 blur-3xl animate-pulse" style="animation-delay:1s"></div>
         </div>
         <div class="relative z-10">
-            <p class="text-cyan-400 text-sm tracking-widest mb-3">PHYPHOS 光强数据 · STFT分析工具</p>
+            <p class="text-cyan-400 text-sm tracking-widest mb-3">PHYPHX 光强数据 · STFT分析工具</p>
             <h1 class="text-4xl md:text-5xl font-bold glow-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
                 迈克尔逊干涉 STFT 条纹分析工具
             </h1>
@@ -369,8 +369,8 @@ function parseFileText(text, fileName) {
     return dataArr;
 }
 
-/** 移动平均平滑 */
-function smoothData(data, winSize = 15) {
+/** 移动平均平滑（窗口缩小为3，保留周期波形） */
+function smoothData(data, winSize = 3) {
     const n = data.length;
     if (winSize < 1) throw new Error("窗口必须为正数");
     const half = Math.floor(winSize / 2);
@@ -474,13 +474,13 @@ function calcWavelength(displacementMm, fringeCount) {
     return { waveM, waveNm, err: null };
 }
 
-/** 绘图函数 */
+/** 绘图函数 - 时序图固定Y轴，放大波形起伏 */
 function drawCharts(res) {
     const { processedData, validStageFreqs, validF, t, validZxx } = res;
     if (chart1) chart1.destroy();
     if (chart2) chart2.destroy();
     if (chart3) chart3.destroy();
-    // 时序图
+    // 时序图（固定Y轴范围，清晰显示波峰波谷）
     const ctx1 = document.getElementById("chart1").getContext("2d");
     chart1 = new Chart(ctx1, {
         type: "line",
@@ -493,11 +493,18 @@ function drawCharts(res) {
             plugins: { title: { display: true, text: "去噪后的光照强度时间序列", color:"#e2e8f0" }, legend:{labels:{color:"#cbd5e1"}} },
             scales: {
                 x: { title: { display: true, text: "采样点", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
-                y: { title: { display: true, text: "强度值", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} }
+                y: {
+                    title: { display: true, text: "强度值", color:"#cbd5e1" },
+                    ticks:{color:"#94a3b8"},
+                    grid:{color:"rgba(148,163,184,0.1)"},
+                    // 固定Y轴区间，根据你的数据微调，放大振荡
+                    min: -1.2,
+                    max: 1.2
+                }
             }
         }
     });
-    // 主峰频率图
+    // 主峰频率图不变
     const ctx3 = document.getElementById("chart3").getContext("2d");
     const medF = math.median(validStageFreqs);
     chart3 = new Chart(ctx3, {
@@ -518,7 +525,7 @@ function drawCharts(res) {
             }
         }
     });
-    // STFT时频图
+    // STFT时频图不变
     const ctx2 = document.getElementById("chart2").getContext("2d");
     const datasets = [];
     validF.forEach((freq, idx) => {
