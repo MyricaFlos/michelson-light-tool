@@ -257,15 +257,14 @@
         <!-- 4 可视化模块修改后 -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-3">
             <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">4. 分析可视化曲线</h2>
-            <!-- 第一张时序图 高度最大 -->
-            <div class="chart-wrap mb-6 min-h-[320px]">
+            <!-- 第一张时序图：大幅加高纵向高度，宽度不变 -->
+            <div class="chart-wrap mb-6 min-h-[400px]">
                 <canvas id="chart1"></canvas>
             </div>
-            <!-- 第二张STFT图 -->
+            <!-- 第二、三张高度不变 -->
             <div class="chart-wrap mb-6 min-h-[260px]">
                 <canvas id="chart2"></canvas>
             </div>
-            <!-- 第三张频率图 -->
             <div class="chart-wrap min-h-[260px]">
                 <canvas id="chart3"></canvas>
             </div>
@@ -432,7 +431,7 @@ function analyzeData(data, params) {
     }
     const denoised = smoothData(data, 15);
     const meanVal = math.mean(denoised);
-    const processed = denoised.map(v => v - meanVal);
+    const processed = denoised.map(v => (v - meanVal) * 5);
     const nperseg = windowSize;
     const noverlap = Math.floor(nperseg * overlap);
     const stftRes = stftTransform(processed, samplingRate, nperseg, noverlap);
@@ -483,14 +482,14 @@ function drawCharts(res) {
     if (chart2) chart2.destroy();
     if (chart3) chart3.destroy();
 
-    // ========== 第一张：时序图 纵向放大、Y轴大幅拉开 ==========
+    // ========== 第一张时序图：纵向加高配套宽Y轴 ==========
     const ctx1 = document.getElementById("chart1").getContext("2d");
     chart1 = new Chart(ctx1, {
         type: "line",
         data: {
             labels: processedData.map((_, i) => i),
             datasets: [{
-                label: "去噪光照强度时序",
+                label: "去噪光照强度时序（振荡放大5倍）",
                 data: processedData,
                 borderColor: "#06b6d4",
                 pointRadius: 0,
@@ -500,7 +499,7 @@ function drawCharts(res) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false, // 允许容器自由拉高
+            maintainAspectRatio: false,
             plugins: {
                 title: { display: true, text: "去噪后的光照强度时间序列", color: "#e2e8f0", font: { size: 16 } },
                 legend: { labels: { color: "#cbd5e1" } }
@@ -512,17 +511,17 @@ function drawCharts(res) {
                     grid: { color: "rgba(148,163,184,0.1)" }
                 },
                 y: {
-                    title: { display: true, text: "强度值", color: "#cbd5e1" },
+                    title: { display: true, text: "强度差值（放大5倍）", color: "#cbd5e1" },
                     ticks: { color: "#94a3b8" },
                     grid: { color: "rgba(148,163,184,0.1)" },
-                    min: -1.6,  // 向下拓宽
-                    max: 1.6    // 向上拓宽，振荡会非常明显
+                    min: -8,
+                    max: 8
                 }
             }
         }
     });
 
-    // ========== 第二张 STFT时频振幅图 ==========
+    // ========== 第二张 STFT时频振幅图（完全不变） ==========
     const ctx2 = document.getElementById("chart2").getContext("2d");
     const datasets = [];
     validF.forEach((freq, idx) => {
@@ -560,7 +559,7 @@ function drawCharts(res) {
         }
     });
 
-    // ========== 第三张 分窗口主峰频率图 ==========
+    // ========== 第三张 分窗口主峰频率图（完全不变） ==========
     const ctx3 = document.getElementById("chart3").getContext("2d");
     const medF = math.median(validStageFreqs);
     chart3 = new Chart(ctx3, {
