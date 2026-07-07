@@ -194,7 +194,7 @@
                 迈克尔逊干涉 STFT 条纹分析工具
             </h1>
             <p class="text-slate-400 text-lg max-w-2xl mx-auto">
-                直接上传Phyphox原生CSV/TXT，自动识别Luminance列，短时傅里叶变换提取干涉条纹，计算激光波长
+                上传使用Phyphox采集光强数据的CSV文件，自动识别Luminance列，短时傅里叶变换提取干涉条纹，计算激光波长
             </p>
         </div>
     </header>
@@ -209,7 +209,7 @@
 
         <!-- 2 参数配置模块 -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-2">
-            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">2. 算法参数配置（默认与Python源码对齐）</h2>
+            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">2. 算法参数配置（默认使用源码参数）</h2>
             <div class="grid md:grid-cols-2 gap-5 mb-4">
                 <div>
                     <label class="text-slate-300 text-sm block mb-2">采样率 sampling_rate (Hz)</label>
@@ -238,7 +238,7 @@
             </div>
             <div class="mb-6">
                 <label class="text-slate-300 text-sm block mb-2">动镜位移 displacement (mm)</label>
-                <input class="input-dark w-full" type="number" id="displacement" placeholder="输入位移，如 0.05" step="0.001" value="0.05">
+                <input class="input-dark w-full" type="number" id="displacement" placeholder="输入位移，如 0.05" step="0.001">
             </div>
             <button class="btn-main" onclick="runFullAnalysis()">执行完整 STFT 分析计算</button>
         </section>
