@@ -269,14 +269,69 @@
         </section>
     </main>
 
-    <!-- JS依赖（更换稳定CDN，调整加载顺序） -->
+    <!-- 仅保留Chart、mathjs，彻底移除fft.js外部CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.0/lib/browser/math.min.js"></script>
-    <!-- 替换为jsDelivr稳定fft.js地址 -->
-    <script src="https://cdn.jsdelivr.net/npm/fft.js@4.0.4/dist/fft.min.js"></script>
 <script>
 let rawLightData = [];
 let chart1, chart2, chart3;
+
+// ====================== 内置FFT实现，不再依赖外部fft.js ======================
+function FFT(size) {
+    this.n = size;
+    this.bits = Math.log2(size);
+    if ((1 << this.bits) !== size) throw new Error("FFT窗口必须为2的整数次幂");
+    this.real = new Array(size).fill(0);
+    this.imag = new Array(size).fill(0);
+}
+FFT.prototype.transform = function(input) {
+    const n = this.n;
+    for (let i = 0; i < n; i++) {
+        this.real[i] = input[2 * i];
+        this.imag[i] = input[2 * i + 1] || 0;
+    }
+    // 位反转置换
+    let j = 0;
+    for (let i = 1; i < n; i++) {
+        let m = n >> 1;
+        for (; j >= m; m >>= 1) j -= m;
+        j += m;
+        if (i < j) {
+            [this.real[i], this.real[j]] = [this.real[j], this.real[i]];
+            [this.imag[i], this.imag[j]] = [this.imag[j], this.imag[i]];
+        }
+    }
+    // 蝶形运算
+    for (let s = 1; s <= this.bits; s++) {
+        const m = 1 << s;
+        const mh = m >> 1;
+        const ang = -2 * Math.PI / m;
+        const wr = Math.cos(ang);
+        const wi = Math.sin(ang);
+        for (let k = 0; k < n; k += m) {
+            let wrk = 1, wik = 0;
+            for (let j = 0; j < mh; j++) {
+                const t1r = wrk * this.real[k + j + mh] - wik * this.imag[k + j + mh];
+                const t1i = wrk * this.imag[k + j + mh] + wik * this.real[k + j + mh];
+                const t2r = this.real[k + j];
+                const t2i = this.imag[k + j];
+                this.real[k + j] = t2r + t1r;
+                this.imag[k + j] = t2i + t1i;
+                this.real[k + j + mh] = t2r - t1r;
+                this.imag[k + j + mh] = t2i - t1i;
+                const wrkNew = wrk * wr - wik * wi;
+                const wikNew = wrk * wi + wik * wr;
+                wrk = wrkNew;
+                wik = wikNew;
+            }
+        }
+    }
+    // 写回输出数组
+    for (let i = 0; i < n; i++) {
+        input[2 * i] = this.real[i];
+        input[2 * i + 1] = this.imag[i];
+    }
+};
 
 /**
  * CSV解析：自动匹配表头Luminance列
@@ -333,11 +388,8 @@ function smoothData(data, winSize = 15) {
     return res;
 }
 
-/** STFT变换（增加FFT存在校验） */
+/** STFT变换（使用内置FFT，无外部依赖） */
 function stftTransform(sig, fs, nperseg, noverlap) {
-    if (typeof FFT === "undefined") {
-        throw new Error("FFT库加载失败，请刷新页面重试");
-    }
     const fftSize = nperseg;
     const fftObj = new FFT(fftSize);
     const step = nperseg - noverlap;
@@ -369,6 +421,11 @@ function analyzeData(data, params) {
     const n = data.length;
     if (n < windowSize) {
         throw new Error(`数据长度(${n})小于STFT窗口大小(${windowSize})，无法执行变换，请更换更长数据或调小窗口`);
+    }
+    // 窗口必须2的幂次校验
+    const log2 = Math.log2(windowSize);
+    if (!Number.isInteger(log2)) {
+        throw new Error(`STFT窗口${windowSize}必须是2的整数次幂（64/128/256/512）`);
     }
     const denoised = smoothData(data, 15);
     const meanVal = math.mean(denoised);
@@ -500,15 +557,11 @@ document.getElementById("fileInput").addEventListener("change", function (e) {
     reader.readAsText(file);
 });
 
-// 核心计算入口，全局捕获异常
+// 一键分析入口，全局捕获异常
 function runFullAnalysis() {
     try{
         const errDom = document.getElementById("errMsg");
         errDom.innerText = "";
-        // 前置校验FFT库
-        if (typeof FFT === "undefined") {
-            throw new Error("FFT计算库加载失败，请刷新页面后重试");
-        }
         if (rawLightData.length === 0) {
             throw new Error("请先上传数据文件！");
         }
