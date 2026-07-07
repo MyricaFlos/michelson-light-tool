@@ -254,16 +254,19 @@
             </div>
         </section>
 
-        <!-- 4 可视化图表模块 -->
+        <!-- 4 可视化模块修改后 -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-3">
             <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">4. 分析可视化曲线</h2>
-            <div class="chart-wrap mb-6">
+            <!-- 第一张时序图 高度最大 -->
+            <div class="chart-wrap mb-6 min-h-[320px]">
                 <canvas id="chart1"></canvas>
             </div>
-            <div class="chart-wrap mb-6">
+            <!-- 第二张STFT图 -->
+            <div class="chart-wrap mb-6 min-h-[260px]">
                 <canvas id="chart2"></canvas>
             </div>
-            <div class="chart-wrap">
+            <!-- 第三张频率图 -->
+            <div class="chart-wrap min-h-[260px]">
                 <canvas id="chart3"></canvas>
             </div>
         </section>
@@ -369,7 +372,7 @@ function parseFileText(text, fileName) {
     return dataArr;
 }
 
-/** 移动平均平滑（窗口缩小为3，保留周期波形） */
+/** 移动平均平滑，窗口缩小为3，保留干涉余弦波形 */
 function smoothData(data, winSize = 3) {
     const n = data.length;
     if (winSize < 1) throw new Error("窗口必须为正数");
@@ -474,37 +477,90 @@ function calcWavelength(displacementMm, fringeCount) {
     return { waveM, waveNm, err: null };
 }
 
-/** 绘图函数 - 时序图固定Y轴，放大波形起伏 */
 function drawCharts(res) {
     const { processedData, validStageFreqs, validF, t, validZxx } = res;
     if (chart1) chart1.destroy();
     if (chart2) chart2.destroy();
     if (chart3) chart3.destroy();
-    // 时序图（固定Y轴范围，清晰显示波峰波谷）
+
+    // ========== 第一张：时序图 纵向放大、Y轴大幅拉开 ==========
     const ctx1 = document.getElementById("chart1").getContext("2d");
     chart1 = new Chart(ctx1, {
         type: "line",
         data: {
             labels: processedData.map((_, i) => i),
-            datasets: [{ label: "去噪光照强度时序", data: processedData, borderColor: "#06b6d4", pointRadius: 0, borderWidth: 1.5, tension:0.2 }]
+            datasets: [{
+                label: "去噪光照强度时序",
+                data: processedData,
+                borderColor: "#06b6d4",
+                pointRadius: 0,
+                borderWidth: 1.8,
+                tension: 0.2
+            }]
         },
         options: {
-            responsive: true, maintainAspectRatio:false,
-            plugins: { title: { display: true, text: "去噪后的光照强度时间序列", color:"#e2e8f0" }, legend:{labels:{color:"#cbd5e1"}} },
+            responsive: true,
+            maintainAspectRatio: false, // 允许容器自由拉高
+            plugins: {
+                title: { display: true, text: "去噪后的光照强度时间序列", color: "#e2e8f0", font: { size: 16 } },
+                legend: { labels: { color: "#cbd5e1" } }
+            },
             scales: {
-                x: { title: { display: true, text: "采样点", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
+                x: {
+                    title: { display: true, text: "采样点", color: "#cbd5e1" },
+                    ticks: { color: "#94a3b8" },
+                    grid: { color: "rgba(148,163,184,0.1)" }
+                },
                 y: {
-                    title: { display: true, text: "强度值", color:"#cbd5e1" },
-                    ticks:{color:"#94a3b8"},
-                    grid:{color:"rgba(148,163,184,0.1)"},
-                    // 固定Y轴区间，根据你的数据微调，放大振荡
-                    min: -1.2,
-                    max: 1.2
+                    title: { display: true, text: "强度值", color: "#cbd5e1" },
+                    ticks: { color: "#94a3b8" },
+                    grid: { color: "rgba(148,163,184,0.1)" },
+                    min: -1.6,  // 向下拓宽
+                    max: 1.6    // 向上拓宽，振荡会非常明显
                 }
             }
         }
     });
-    // 主峰频率图不变
+
+    // ========== 第二张 STFT时频振幅图 ==========
+    const ctx2 = document.getElementById("chart2").getContext("2d");
+    const datasets = [];
+    validF.forEach((freq, idx) => {
+        datasets.push({
+            label: `${freq.toFixed(2)}Hz`,
+            data: validZxx[idx],
+            borderWidth: 1.2,
+            pointRadius: 0,
+            tension: 0.2,
+            borderColor: idx % 2 ? "#60a5fa" : "#22d3ee"
+        });
+    });
+    chart2 = new Chart(ctx2, {
+        type: "line",
+        data: { labels: t, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: "STFT时频振幅曲线", color: "#e2e8f0", font: { size: 16 } },
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: "时间 s", color: "#cbd5e1" },
+                    ticks: { color: "#94a3b8" },
+                    grid: { color: "rgba(148,163,184,0.1)" }
+                },
+                y: {
+                    title: { display: true, text: "振幅", color: "#cbd5e1" },
+                    ticks: { color: "#94a3b8" },
+                    grid: { color: "rgba(148,163,184,0.1)" }
+                }
+            }
+        }
+    });
+
+    // ========== 第三张 分窗口主峰频率图 ==========
     const ctx3 = document.getElementById("chart3").getContext("2d");
     const medF = math.median(validStageFreqs);
     chart3 = new Chart(ctx3, {
@@ -512,34 +568,42 @@ function drawCharts(res) {
         data: {
             labels: validStageFreqs.map((_, i) => i),
             datasets: [
-                { label: "各窗口主峰频率", data: validStageFreqs, borderColor: "#3b82f6", pointRadius: 0, tension:0.2 },
-                { label: `平均频率 ${medF.toFixed(2)}Hz`, data: validStageFreqs.map(() => medF), borderColor: "#ff8a3d", borderDash: [5,5], pointRadius:0 }
+                {
+                    label: "各窗口主峰频率",
+                    data: validStageFreqs,
+                    borderColor: "#3b82f6",
+                    pointRadius: 0,
+                    tension: 0.2,
+                    borderWidth:1.8
+                },
+                {
+                    label: `平均频率 ${medF.toFixed(2)}Hz`,
+                    data: validStageFreqs.map(() => medF),
+                    borderColor: "#ff8a3d",
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    borderWidth:1.8
+                }
             ]
         },
         options: {
-            responsive: true, maintainAspectRatio:false,
-            plugins: { title: { display: true, text: "分窗口主峰频率变化", color:"#e2e8f0" }, legend:{labels:{color:"#cbd5e1"}} },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: "分窗口主峰频率变化", color: "#e2e8f0", font: { size: 16 } },
+                legend: { labels: { color: "#cbd5e1" } }
+            },
             scales: {
-                x: { title: { display: true, text: "窗口序号", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
-                y: { title: { display: true, text: "频率 Hz", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} }
-            }
-        }
-    });
-    // STFT时频图不变
-    const ctx2 = document.getElementById("chart2").getContext("2d");
-    const datasets = [];
-    validF.forEach((freq, idx) => {
-        datasets.push({ label: `${freq.toFixed(2)}Hz`, data: validZxx[idx], borderWidth: 1, pointRadius: 0, tension:0.2, borderColor: idx%2?"#60a5fa":"#22d3ee" });
-    });
-    chart2 = new Chart(ctx2, {
-        type: "line",
-        data: { labels: t, datasets },
-        options: {
-            responsive: true, maintainAspectRatio:false,
-            plugins: { title: { display: true, text: "STFT时频振幅曲线", color:"#e2e8f0" }, legend:{display:false} },
-            scales: {
-                x: { title: { display: true, text: "时间 s", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} },
-                y: { title: { display: true, text: "振幅", color:"#cbd5e1" }, ticks:{color:"#94a3b8"}, grid:{color:"rgba(148,163,184,0.1)"} }
+                x: {
+                    title: { display: true, text: "窗口序号", color: "#cbd5e1" },
+                    ticks: { color: "#94a3b8" },
+                    grid: { color: "rgba(148,163,184,0.1)" }
+                },
+                y: {
+                    title: { display: true, text: "频率 Hz", color: "#cbd5e1" },
+                    ticks: { color: "#94a3b8" },
+                    grid: { color: "rgba(148,163,184,0.1)" }
+                }
             }
         }
     });
