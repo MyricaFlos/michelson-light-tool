@@ -207,38 +207,107 @@
             <p class="text-slate-400 text-sm mt-3">支持：Phyphox原生多列CSV（自动识别Luminance列）、空格分隔TXT；兼容科学计数法</p>
         </section>
 
-        <!-- 2 参数配置模块 -->
+       <!-- 2 参数配置模块（新增参数悬浮说明） -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-2">
             <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">2. 算法参数配置（默认使用源码参数）</h2>
             <div class="grid md:grid-cols-2 gap-5 mb-4">
-                <div>
-                    <label class="text-slate-300 text-sm block mb-2">采样率 sampling_rate (Hz)</label>
+                <!-- 采样率 sampling_rate -->
+                <div class="param-tip-wrap relative group">
+                    <label class="text-slate-300 text-sm flex items-center gap-2 mb-2">
+                        采样率 sampling_rate (Hz)
+                        <span class="w-5 h-5 rounded-full border border-cyan-400 text-cyan-400 text-xs flex items-center justify-center cursor-help">?</span>
+                    </label>
                     <input class="input-dark w-full" type="number" id="samplingRate" value="100" step="1">
+                    <!-- 悬浮提示框 -->
+                    <div class="absolute left-0 top-full mt-2 w-[320px] p-4 bg-slate-900 border border-cyan-600 rounded-lg text-sm text-slate-200 z-50 hidden group-hover:block">
+                        <div class="text-cyan-300 font-medium mb-1">采样率 (Hz)</div>
+                        <p>Phyphox采集光强时设置的每秒采样点数，必须和导出CSV时的采集参数完全一致。</p>
+                        <p class="mt-1 text-slate-400">示例：100 = 1秒采集100个光强数据点</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-slate-300 text-sm block mb-2">最小有效频率 min_freq (Hz)</label>
+
+                <!-- 最小有效频率 min_freq -->
+                <div class="param-tip-wrap relative group">
+                    <label class="text-slate-300 text-sm flex items-center gap-2 mb-2">
+                        最小有效频率 min_freq (Hz)
+                        <span class="w-5 h-5 rounded-full border border-cyan-400 text-cyan-400 text-xs flex items-center justify-center cursor-help">?</span>
+                    </label>
                     <input class="input-dark w-full" type="number" id="minFreq" value="0.1" step="0.01">
+                    <div class="absolute left-0 top-full mt-2 w-[320px] p-4 bg-slate-900 border border-cyan-600 rounded-lg text-sm text-slate-200 z-50 hidden group-hover:block">
+                        <div class="text-cyan-300 font-medium mb-1">最小有效频率 (Hz)</div>
+                        <p>过滤低于该数值的低频噪声（设备基线漂移、环境慢干扰），只保留高于此频率的干涉条纹信号。</p>
+                        <p class="mt-1 text-slate-400">调大：过滤更多低频漂移；调小：保留极慢移动产生的条纹</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-slate-300 text-sm block mb-2">最大有效频率 max_freq (Hz)</label>
+
+                <!-- 最大有效频率 max_freq -->
+                <div class="param-tip-wrap relative group">
+                    <label class="text-slate-300 text-sm flex items-center gap-2 mb-2">
+                        最大有效频率 max_freq (Hz)
+                        <span class="w-5 h-5 rounded-full border border-cyan-400 text-cyan-400 text-xs flex items-center justify-center cursor-help">?</span>
+                    </label>
                     <input class="input-dark w-full" type="number" id="maxFreq" value="5.0" step="0.01">
+                    <div class="absolute left-0 top-full mt-2 w-[320px] p-4 bg-slate-900 border border-cyan-600 rounded-lg text-sm text-slate-200 z-50 hidden group-hover:block">
+                        <div class="text-cyan-300 font-medium mb-1">最大有效频率 (Hz)</div>
+                        <p>过滤高于该数值的高频噪声（灯光频闪、传感器杂波），仅保留干涉条纹的有效频率区间。</p>
+                        <p class="mt-1 text-slate-400">动镜移动越快，条纹频率越高，需要同步增大此数值</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-slate-300 text-sm block mb-2">STFT窗口 window_size</label>
+
+                <!-- STFT窗口 window_size -->
+                <div class="param-tip-wrap relative group">
+                    <label class="text-slate-300 text-sm flex items-center gap-2 mb-2">
+                        STFT窗口 window_size
+                        <span class="w-5 h-5 rounded-full border border-cyan-400 text-cyan-400 text-xs flex items-center justify-center cursor-help">?</span>
+                    </label>
                     <input class="input-dark w-full" type="number" id="winSize" value="256" step="16">
+                    <div class="absolute left-0 top-full mt-2 w-[320px] p-4 bg-slate-900 border border-cyan-600 rounded-lg text-sm text-slate-200 z-50 hidden group-hover:block">
+                        <div class="text-cyan-300 font-medium mb-1">STFT窗口大小</div>
+                        <p>短时傅里叶变换单段数据长度，<b>必须是2的整数次幂：64/128/256/512</b></p>
+                        <p class="mt-1 text-slate-400">更大窗口：频率精度更高、时间分辨率变差；更小窗口：能捕捉频率快速变化，但频率误差变大</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-slate-300 text-sm block mb-2">窗口重叠 overlap</label>
+
+                <!-- 窗口重叠 overlap -->
+                <div class="param-tip-wrap relative group">
+                    <label class="text-slate-300 text-sm flex items-center gap-2 mb-2">
+                        窗口重叠 overlap
+                        <span class="w-5 h-5 rounded-full border border-cyan-400 text-cyan-400 text-xs flex items-center justify-center cursor-help">?</span>
+                    </label>
                     <input class="input-dark w-full" type="number" id="overlap" value="0.5" step="0.05" min="0" max="0.95">
+                    <div class="absolute left-0 top-full mt-2 w-[320px] p-4 bg-slate-900 border border-cyan-600 rounded-lg text-sm text-slate-200 z-50 hidden group-hover:block">
+                        <div class="text-cyan-300 font-medium mb-1">窗口重叠比例</div>
+                        <p>相邻两个STFT分析窗口重复的数据占比，范围0~0.95。</p>
+                        <p class="mt-1 text-slate-400">0.5 = 前后窗口各一半数据重叠；数值越大，时频曲线越平滑，但计算速度变慢</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-slate-300 text-sm block mb-2">条纹修正系数 fringe_coeff</label>
+
+                <!-- 条纹修正系数 fringe_coeff -->
+                <div class="param-tip-wrap relative group">
+                    <label class="text-slate-300 text-sm flex items-center gap-2 mb-2">
+                        条纹修正系数 fringe_coeff
+                        <span class="w-5 h-5 rounded-full border border-cyan-400 text-cyan-400 text-xs flex items-center justify-center cursor-help">?</span>
+                    </label>
                     <input class="input-dark w-full" type="number" id="fringeCoeff" value="1.15" step="0.01">
+                    <div class="absolute left-0 top-full mt-2 w-[320px] p-4 bg-slate-900 border border-cyan-600 rounded-lg text-sm text-slate-200 z-50 hidden group-hover:block">
+                        <div class="text-cyan-300 font-medium mb-1">条纹修正系数</div>
+                        <p>补偿STFT分段截断、噪声过滤带来的条纹计数误差，修正最终条纹总数N。</p>
+                        <p class="mt-1 text-slate-400">计算波长偏大 → 增大系数；波长偏小 → 减小系数；标准激光实验默认1.15</p>
+                    </div>
                 </div>
             </div>
-            <div class="mb-6">
-                <label class="text-slate-300 text-sm block mb-2">动镜位移 displacement (mm)</label>
+            <!-- 动镜位移 -->
+            <div class="mb-6 param-tip-wrap relative group">
+                <label class="text-slate-300 text-sm flex items-center gap-2 mb-2">
+                    动镜位移 displacement (mm)
+                    <span class="w-5 h-5 rounded-full border border-cyan-400 text-cyan-400 text-xs flex items-center justify-center cursor-help">?</span>
+                </label>
                 <input class="input-dark w-full" type="number" id="displacement" placeholder="输入位移，如 0.05" step="0.001">
+                <div class="absolute left-0 top-full mt-2 w-[320px] p-4 bg-slate-900 border border-cyan-600 rounded-lg text-sm text-slate-200 z-50 hidden group-hover:block">
+                    <div class="text-cyan-300 font-medium mb-1">动镜位移 (mm)</div>
+                    <p>迈克尔逊干涉实验中，可移动反射镜单向移动的总距离，用于波长核心计算公式 λ=2d/N。</p>
+                    <p class="mt-1 text-slate-400">必须填写实验实际测量数值，空值/负数会直接报错无法计算</p>
+                </div>
             </div>
             <button class="btn-main" onclick="runFullAnalysis()">执行完整 STFT 分析计算</button>
         </section>
