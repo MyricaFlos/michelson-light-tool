@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>迈克尔逊干涉 STFT 条纹分析工具 v2</title>
+    <title>迈克尔逊干涉条纹分析工具 (带通+过零)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
@@ -11,133 +11,50 @@
         body {
             font-family: 'Noto Sans SC', sans-serif;
             background: #0a0e1a;
-            background-image:
-                radial-gradient(circle at 20% 30%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
+            background-image: radial-gradient(circle at 20% 30%, rgba(6, 182, 212, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(59, 130, 246, 0.15) 0%, transparent 50%);
             color: #e2e8f0;
         }
         body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
-            pointer-events: none;
-            z-index: 0;
+            content: ''; position: fixed; inset: 0;
+            background-image: linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px; pointer-events: none; z-index: 0;
         }
         body > * { position: relative; z-index: 1; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #06b6d4, #3b82f6); border-radius: 4px; }
-        ::selection { background: rgba(6, 182, 212, 0.3); color: #fff; }
         .glass-card {
-            background: rgba(15, 23, 42, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(148, 163, 184, 0.15);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.15); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             transition: all 0.35s ease;
         }
-        .glass-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(6, 182, 212, 0.12);
-            border-color: rgba(6, 182, 212, 0.25);
-        }
+        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(6, 182, 212, 0.12); border-color: rgba(6, 182, 212, 0.25); }
         .gradient-border { position: relative; }
         .gradient-border::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            padding: 1px;
-            background: linear-gradient(135deg, #06b6d4, #3b82f6, #8b5cf6);
-            background-size: 200% 200%;
-            animation: gradientFlow 8s ease infinite;
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
+            content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6, #8b5cf6); background-size: 200% 200%;
+            animation: gradientFlow 8s ease infinite; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
         }
-        @keyframes gradientFlow {
-            0%,100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-        }
+        @keyframes gradientFlow { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         .glow-text { text-shadow: 0 0 20px rgba(6, 182, 212, 0.5); }
         .section-title { position: relative; padding-left: 16px; }
         .section-title::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 4px;
-            height: 70%;
-            background: linear-gradient(180deg, #06b6d4, #3b82f6);
-            border-radius: 2px;
-            box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+            content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            width: 4px; height: 70%; background: linear-gradient(180deg, #06b6d4, #3b82f6);
+            border-radius: 2px; box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
         }
-        .input-dark {
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            color: #e2e8f0;
-            border-radius: 8px;
-            padding: 10px 14px;
-            outline: none;
-            transition: 0.2s;
-        }
+        .input-dark { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); color: #e2e8f0; border-radius: 8px; padding: 10px 14px; outline: none; transition: 0.2s; }
         .input-dark:focus { border-color: #06b6d4; box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15); }
-        .btn-main {
-            background: linear-gradient(135deg, #06b6d4, #3b82f6);
-            color: white;
-            padding: 12px 28px;
-            border-radius: 8px;
-            border: none;
-            font-weight: 500;
-            transition: 0.25s;
-        }
+        .btn-main { background: linear-gradient(135deg, #06b6d4, #3b82f6); color: white; padding: 12px 28px; border-radius: 8px; border: none; font-weight: 500; transition: 0.25s; }
         .btn-main:hover { box-shadow: 0 0 16px rgba(6, 182, 212, 0.4); transform: translateY(-2px); }
-        .btn-main:active { transform: scale(0.98); }
-        .btn-secondary {
-            background: rgba(30, 41, 59, 0.8);
-            color: #cbd5e1;
-            padding: 8px 16px;
-            border-radius: 6px;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            font-size: 14px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-secondary:hover { background: rgba(30, 41, 59, 1); border-color: #06b6d4; color: #fff; }
-        .result-block {
-            background: rgba(15, 23, 42, 0.5);
-            border-left: 3px solid #06b6d4;
-            padding: 18px 22px;
-            border-radius: 0 10px 10px 0;
-        }
+        .result-block { background: rgba(15, 23, 42, 0.5); border-left: 3px solid #06b6d4; padding: 18px 22px; border-radius: 0 10px 10px 0; }
         .result-value { color: #06e0f0; font-weight: 600; font-size: 18px; }
-        .warn-block {
-            background: rgba(245, 158, 11, 0.1);
-            border-left: 3px solid #f59e0b;
-            padding: 12px 16px;
-            border-radius: 0 8px 8px 0;
-            color: #fcd34d;
-            font-size: 13px;
-        }
-        .chart-wrap {
-            background: radial-gradient(circle, #0f172a 0%, #020617 100%);
-            border-radius: 12px;
-            padding: 12px;
-            box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
-        }
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .warn-block { background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; color: #fcd34d; font-size: 13px; }
+        .chart-wrap { background: radial-gradient(circle, #0f172a 0%, #020617 100%); border-radius: 12px; padding: 12px; box-shadow: inset 0 0 30px rgba(0,0,0,0.4); }
         .fade-animate { animation: fadeUp 0.7s ease forwards; opacity: 0; }
-        .delay-1 { animation-delay: 0.1s; }
-        .delay-2 { animation-delay: 0.25s; }
-        .delay-3 { animation-delay: 0.4s; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.25s; } .delay-3 { animation-delay: 0.4s; }
     </style>
 </head>
 <body class="min-h-screen pb-20">
@@ -147,92 +64,72 @@
             <div class="absolute bottom-0 right-1/4 w-72 h-72 rounded-full bg-blue-600 blur-3xl animate-pulse" style="animation-delay:1s"></div>
         </div>
         <div class="relative z-10">
-            <p class="text-cyan-400 text-sm tracking-widest mb-3">PHYPHOX 光强数据 · STFT分析工具 v2</p>
+            <p class="text-cyan-400 text-sm tracking-widest mb-3">PHYPHOX 光强数据 · 物理过零检测</p>
             <h1 class="text-4xl md:text-5xl font-bold glow-text bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
-                迈克尔逊干涉 STFT 条纹分析工具
+                迈克尔逊干涉条纹分析工具
             </h1>
             <p class="text-slate-400 text-lg max-w-2xl mx-auto">
-                自动提取采样率 · 汉宁窗STFT · 抛物线插值峰值 · 加权周期累加 · 累积条纹可视化
+                自动采样率 · 频域带通滤波 · 自适应滞回过零计数 · 累积条纹可视化
             </p>
         </div>
     </header>
 
     <main class="max-w-5xl mx-auto px-6 space-y-10">
-        <!-- 1 文件上传 -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-1">
             <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">1. 上传光强数据文件</h2>
             <input class="input-dark w-full" type="file" id="fileInput" accept=".txt,.csv">
             <div id="fileInfo" class="text-slate-400 text-sm mt-3"></div>
-            <div id="columnSelectWrap" class="mt-4 hidden">
-                <label class="text-slate-300 text-sm mb-2 block">检测到多列数据，请选择光强列：</label>
-                <select id="columnSelect" class="input-dark w-full"></select>
-            </div>
         </section>
 
-        <!-- 2 参数配置 -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-2">
             <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">2. 算法参数配置</h2>
             <div class="grid md:grid-cols-2 gap-5 mb-4">
                 <div>
-                    <label class="text-slate-300 text-sm block mb-2">采样率 (Hz) <span class="text-slate-500 text-xs">— 留空则自动从时间列提取</span></label>
+                    <label class="text-slate-300 text-sm block mb-2">采样率 (Hz) <span class="text-slate-500 text-xs">— 留空自动提取</span></label>
                     <input class="input-dark w-full" type="number" id="samplingRate" placeholder="自动检测" step="1">
                 </div>
                 <div>
-                    <label class="text-slate-300 text-sm block mb-2">最小有效频率 min_freq (Hz)</label>
-                    <input class="input-dark w-full" type="number" id="minFreq" value="0.1" step="0.01">
+                    <label class="text-slate-300 text-sm block mb-2">带通滤波下限 min_freq (Hz)</label>
+                    <input class="input-dark w-full" type="number" id="minFreq" value="1.0" step="0.1">
                 </div>
                 <div>
-                    <label class="text-slate-300 text-sm block mb-2">最大有效频率 max_freq (Hz)</label>
-                    <input class="input-dark w-full" type="number" id="maxFreq" value="5.0" step="0.01">
+                    <label class="text-slate-300 text-sm block mb-2">带通滤波上限 max_freq (Hz)</label>
+                    <input class="input-dark w-full" type="number" id="maxFreq" value="15.0" step="0.1">
                 </div>
                 <div>
-                    <label class="text-slate-300 text-sm block mb-2">STFT窗口 window_size <span class="text-slate-500 text-xs">— 2的幂：64/128/256/512</span></label>
-                    <input class="input-dark w-full" type="number" id="winSize" value="256" step="16">
+                    <label class="text-slate-300 text-sm block mb-2">过零阈值系数 (0~1) <span class="text-slate-500 text-xs">— 默认0.3抗噪</span></label>
+                    <input class="input-dark w-full" type="number" id="thresholdCoeff" value="0.3" step="0.05" min="0.1" max="0.9">
                 </div>
                 <div>
-                    <label class="text-slate-300 text-sm block mb-2">窗口重叠 overlap (0~0.95)</label>
-                    <input class="input-dark w-full" type="number" id="overlap" value="0.5" step="0.05" min="0" max="0.95">
-                </div>
-                <div>
-                    <label class="text-slate-300 text-sm block mb-2">条纹修正系数 fringe_coeff <span class="text-slate-500 text-xs">— 需用已知波长标定</span></label>
+                    <label class="text-slate-300 text-sm block mb-2">条纹修正系数 <span class="text-slate-500 text-xs">— 默认1.0</span></label>
                     <input class="input-dark w-full" type="number" id="fringeCoeff" value="1.0" step="0.01">
                 </div>
+                <div>
+                    <label class="text-slate-300 text-sm block mb-2">动镜位移 displacement (mm)</label>
+                    <input class="input-dark w-full" type="number" id="displacement" placeholder="如 0.05" step="0.001">
+                </div>
             </div>
-            <div class="mb-4">
-                <label class="text-slate-300 text-sm block mb-2">动镜位移 displacement (mm)</label>
-                <input class="input-dark w-full" type="number" id="displacement" placeholder="输入位移，如 0.05" step="0.001">
-            </div>
-            <div class="flex gap-3">
-                <button class="btn-main" onclick="runFullAnalysis()">执行完整 STFT 分析计算</button>
-                <button class="btn-secondary" onclick="toggleCalibrationHelp()">修正系数标定说明</button>
-            </div>
-            <div id="calibrationHelp" class="warn-block mt-4 hidden">
-                <strong>修正系数标定流程：</strong>用已知波长激光（如 He-Ne 632.8 nm），在 3~5 个不同步进电机速度下各测一次，记录原始未修正条纹数 N_raw 与理论条纹数 N_theory = 2d/λ。系数 = N_theory / N_raw 的均值。若系数随速度变化超过 5%，说明 STFT 累加法有速度依赖，需考虑相位解缠替代方案。
-            </div>
+            <button class="btn-main" onclick="runFullAnalysis()">执行分析计算</button>
         </section>
 
-        <!-- 3 计算结果 -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-2">
-            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">3. 计算结果</h2>
+            <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">3. 计算结果与诊断</h2>
             <div class="result-block">
                 <p class="text-slate-300 text-base my-3">识别总条纹数 N：<span class="result-value" id="fringeCount">--</span></p>
                 <p class="text-slate-300 text-base my-3">波长 λ (米)：<span class="result-value" id="waveM">--</span></p>
                 <p class="text-slate-300 text-base my-3">波长 λ (纳米)：<span class="result-value" id="waveNm">--</span></p>
-                <p class="text-slate-300 text-base my-3">实际采样率：<span class="result-value" id="actualFs">--</span> Hz</p>
-                <p class="text-slate-300 text-base my-3">有效分析时间占比：<span class="result-value" id="validTimeRatio">--</span></p>
-                <p class="text-slate-300 text-base my-3">丢弃/低权重窗口占比：<span class="result-value" id="discardRatio">--</span></p>
+                <p class="text-slate-300 text-base my-3">系统采样率：<span class="result-value" id="actualFs">--</span> Hz</p>
+                <p class="text-slate-300 text-base my-3">估算平均条纹频率：<span class="result-value" id="estFreq">--</span> Hz</p>
                 <p id="errMsg" class="text-red-400 text-sm mt-2"></p>
                 <p id="warnMsg" class="text-amber-400 text-sm mt-2"></p>
             </div>
         </section>
 
-        <!-- 4 可视化 -->
         <section class="glass-card rounded-2xl p-8 gradient-border fade-animate delay-3">
             <h2 class="section-title text-2xl font-semibold text-cyan-300 mb-6">4. 分析可视化曲线</h2>
-            <div class="chart-wrap mb-6 min-h-[400px]"><canvas id="chart1"></canvas></div>
+            <div class="chart-wrap mb-6 min-h-[350px]"><canvas id="chart1"></canvas></div>
             <div class="chart-wrap mb-6 min-h-[260px]"><canvas id="chart2"></canvas></div>
-            <div class="chart-wrap mb-6 min-h-[260px]"><canvas id="chart3"></canvas></div>
-            <div class="chart-wrap min-h-[260px]"><canvas id="chart4"></canvas></div>
+            <div class="chart-wrap min-h-[260px]"><canvas id="chart3"></canvas></div>
         </section>
     </main>
 
@@ -240,15 +137,14 @@
     <script src="https://cdn.jsdelivr.net/npm/mathjs@11.8.0/lib/browser/math.min.js"></script>
 <script>
 // ====================== 全局状态 ======================
-let rawData = { time: [], values: [], headers: [] };
-let currentColumnIndex = -1;
-let charts = { c1: null, c2: null, c3: null, c4: null };
+let rawData = { time: [], values: [] };
+let charts = { c1: null, c2: null, c3: null };
 
-// ====================== 内置FFT ======================
+// ====================== FFT 库 ======================
 function FFT(size) {
     this.n = size;
     this.bits = Math.log2(size);
-    if ((1 << this.bits) !== size) throw new Error("FFT窗口必须为2的整数次幂");
+    if ((1 << this.bits) !== size) throw new Error("FFT尺寸必须为2的整数次幂");
     this.real = new Array(size).fill(0);
     this.imag = new Array(size).fill(0);
 }
@@ -294,75 +190,28 @@ FFT.prototype.transform = function(input) {
     }
 };
 
-// ====================== 文件解析（候选列名+时间列自动提取） ======================
-const COLUMN_CANDIDATES = ['Luminance', 'Illuminance', 'Lux', 'Light', 'Brightness', 'Value', 'Intensity'];
-
+// ====================== 文件解析 ======================
 function parseFile(text, fileName) {
-    const result = { time: [], values: [], headers: [], allRows: [] };
     const lines = text.replaceAll('\r', '').split('\n').filter(l => l.trim());
-    if (lines.length < 2) throw new Error("文件行数不足，至少需要表头+1行数据");
-
+    if (lines.length < 2) throw new Error("文件行数不足");
+    
     const isCSV = fileName.toLowerCase().endsWith('.csv') || lines[0].includes(',');
-    let headers, dataLines;
-    if (isCSV) {
-        headers = lines[0].split(',').map(h => h.trim());
-        dataLines = lines.slice(1);
-        const rows = dataLines.map(line => {
-            const cols = line.split(',').map(c => c.trim());
-            return cols.map(c => {
-                const v = parseFloat(c);
-                return isNaN(v) ? c : v;
-            });
-        }).filter(r => r.length >= 2);
-        result.allRows = rows;
-    } else {
-        // TXT空格分隔：尝试识别是否为纯数值
-        const firstParts = lines[0].trim().split(/\s+/);
-        const hasHeader = firstParts.some(p => isNaN(parseFloat(p)));
-        headers = hasHeader ? firstParts : firstParts.map((_, i) => `Col${i}`);
-        dataLines = hasHeader ? lines.slice(1) : lines;
-        const rows = dataLines.map(line => line.trim().split(/\s+/).map(c => parseFloat(c))).filter(r => r.length >= 2 && r.every(v => !isNaN(v)));
-        result.allRows = rows;
-    }
-    result.headers = headers;
-    return result;
-}
+    const headers = isCSV ? lines[0].split(',').map(h => h.trim().replace(/"/g, '')) : lines[0].trim().split(/\s+/);
+    const dataLines = lines.slice(1);
+    
+    // 智能识别时间列与光强列
+    let timeIdx = headers.findIndex(h => /time|t\b/i.test(h));
+    if (timeIdx === -1) timeIdx = 0; 
+    let valIdx = headers.findIndex(h => /Luminance|Luma|Light|Intensity/i.test(h));
+    if (valIdx === -1) valIdx = headers.length > 1 ? 1 : 0;
 
-function findColumnIndex(headers) {
-    for (const cand of COLUMN_CANDIDATES) {
-        const idx = headers.findIndex(h => h.toLowerCase() === cand.toLowerCase());
-        if (idx !== -1) return idx;
-    }
-    return -1;
-}
-
-function extractDataFromRows(rows, headers, valueColIdx) {
-    // 尝试找时间列
-    let timeColIdx = -1;
-    for (let i = 0; i < headers.length; i++) {
-        if (/time|时间/i.test(headers[i])) { timeColIdx = i; break; }
-    }
-    if (timeColIdx === -1 && rows.length > 0 && rows[0].length >= 2) {
-        // 若无时间列名，但第一列数值单调递增，假定第一列为时间
-        const firstVals = rows.slice(0, Math.min(20, rows.length)).map(r => r[0]);
-        const allNum = firstVals.every(v => typeof v === 'number');
-        if (allNum) {
-            let monotonic = true;
-            for (let i = 1; i < firstVals.length; i++) {
-                if (firstVals[i] <= firstVals[i - 1]) { monotonic = false; break; }
-            }
-            if (monotonic) timeColIdx = 0;
-        }
-    }
     const time = [], values = [];
-    for (const row of rows) {
-        if (typeof row[valueColIdx] !== 'number') continue;
-        values.push(row[valueColIdx]);
-        if (timeColIdx !== -1 && typeof row[timeColIdx] === 'number') {
-            time.push(row[timeColIdx]);
-        } else {
-            time.push(null);
-        }
+    for (const line of dataLines) {
+        const cols = isCSV ? line.split(',') : line.trim().split(/\s+/);
+        if (cols.length <= Math.max(timeIdx, valIdx)) continue;
+        const t = parseFloat(cols[timeIdx]);
+        const v = parseFloat(cols[valIdx]);
+        if (!isNaN(t) && !isNaN(v)) { time.push(t); values.push(v); }
     }
     return { time, values };
 }
@@ -371,332 +220,152 @@ function estimateSamplingRate(time) {
     if (!time || time.length < 10) return null;
     const diffs = [];
     for (let i = 1; i < time.length; i++) {
-        if (time[i] !== null && time[i - 1] !== null) {
-            const d = time[i] - time[i - 1];
-            if (d > 0) diffs.push(d);
-        }
+        const d = time[i] - time[i - 1];
+        if (d > 0) diffs.push(d);
     }
-    if (diffs.length < 5) return null;
     const median = math.median(diffs);
-    if (median <= 0) return null;
-    // 过滤异常间隔
     const filtered = diffs.filter(d => Math.abs(d - median) < median * 0.5);
-    const mean = filtered.reduce((a, b) => a + b, 0) / filtered.length;
-    return 1 / mean;
+    return 1 / (filtered.reduce((a, b) => a + b, 0) / filtered.length);
 }
 
-// ====================== 信号处理 ======================
-function smoothData(data, winSize) {
-    const n = data.length;
-    const half = Math.floor(winSize / 2);
-    const res = new Array(n).fill(0);
-    for (let i = 0; i < n; i++) {
-        let sum = 0, cnt = 0;
-        for (let j = i - half; j <= i + half; j++) {
-            if (j >= 0 && j < n) { sum += data[j]; cnt++; }
-        }
-        res[i] = sum / cnt;
+// ====================== 核心算法：频域带通 + 过零计数 ======================
+function bandpassFilter(signal, fs, lowFreq, highFreq) {
+    const N = signal.length;
+    const fftSize = Math.pow(2, Math.ceil(Math.log2(N)));
+    const fft = new FFT(fftSize);
+    const data = new Array(fftSize * 2).fill(0);
+    for (let i = 0; i < N; i++) data[2 * i] = signal[i];
+    fft.transform(data);
+    
+    const df = fs / fftSize;
+    for (let i = 0; i < fftSize; i++) {
+        const freq = i <= fftSize / 2 ? i * df : (i - fftSize) * df;
+        const gain = (Math.abs(freq) >= lowFreq && Math.abs(freq) <= highFreq) ? 1 : 0;
+        data[2 * i] *= gain;
+        data[2 * i + 1] *= gain;
     }
-    return res;
+    // 逆FFT
+    const invFft = new FFT(fftSize);
+    for (let i = 0; i < fftSize; i++) data[2 * i + 1] = -data[2 * i + 1]; // 共轭
+    invFft.transform(data);
+    const result = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) result[i] = data[2 * i] / fftSize; // 实部除以N
+    return result;
 }
 
-function hannWindow(N) {
-    return Array.from({ length: N }, (_, i) => 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1))));
-}
-
-// STFT with Hann window + parabolic interpolation
-function stftTransform(sig, fs, nperseg, noverlap, minFreq, maxFreq) {
-    const fftSize = nperseg;
-    const fftObj = new FFT(fftSize);
-    const step = nperseg - noverlap;
-    const win = hannWindow(nperseg);
-    const winSum = win.reduce((a, b) => a + b, 0);
-    const winMean = winSum / nperseg;
-    const tAxis = [], freqAxis = [], specMatrix = [], peakFreqs = [], peakAmps = [];
-    const numBins = fftSize / 2 + 1;
-    for (let i = 0; i < numBins; i++) freqAxis.push(i * fs / fftSize);
-
-    for (let start = 0; start + nperseg <= sig.length; start += step) {
-        const seg = sig.slice(start, start + nperseg);
-        const out = new Array(fftSize * 2).fill(0);
-        for (let i = 0; i < nperseg; i++) out[2 * i] = seg[i] * win[i];
-        fftObj.transform(out);
-        const amp = [];
-        for (let i = 0; i < numBins; i++) {
-            const re = out[2 * i], im = out[2 * i + 1];
-            amp.push(Math.sqrt(re * re + im * im) / winMean);
+function countFringesByZeroCrossing(signal, fs, threshRatio) {
+    const n = signal.length;
+    let maxAbs = 0;
+    for (let i = 0; i < n; i++) maxAbs = Math.max(maxAbs, Math.abs(signal[i]));
+    if (maxAbs < 1e-9) return { count: 0, zcPoints: [] };
+    
+    const threshold = maxAbs * threshRatio;
+    let count = 0;
+    let lastSign = 0;
+    const zcPoints = []; // 记录过零位置用于绘图
+    
+    for (let i = 1; i < n; i++) {
+        const v = signal[i];
+        if (Math.abs(v) < threshold) continue;
+        const sign = v > 0 ? 1 : -1;
+        if (lastSign !== 0 && sign !== lastSign) {
+            count++;
+            zcPoints.push({ x: i, y: 0 });
         }
-        specMatrix.push(amp);
-        tAxis.push((start + nperseg / 2) / fs);
-
-        // 逐窗口找主峰并做抛物线插值（仅在有效频段内）
-        let maxAmp = 0, maxIdx = -1;
-        for (let i = 0; i < numBins; i++) {
-            const f = freqAxis[i];
-            if (f < minFreq || f > maxFreq) continue;
-            if (amp[i] > maxAmp) { maxAmp = amp[i]; maxIdx = i; }
-        }
-        let fPeak = 0;
-        if (maxIdx > 0 && maxIdx < numBins - 1) {
-            const y0 = amp[maxIdx - 1], y1 = amp[maxIdx], y2 = amp[maxIdx + 1];
-            const denom = y0 - 2 * y1 + y2;
-            const delta = Math.abs(denom) > 1e-12 ? 0.5 * (y0 - y2) / denom : 0;
-            fPeak = (maxIdx + Math.max(-0.5, Math.min(0.5, delta))) * fs / fftSize;
-        } else if (maxIdx >= 0) {
-            fPeak = freqAxis[maxIdx];
-        }
-        peakFreqs.push(fPeak);
-        peakAmps.push(maxAmp);
+        lastSign = sign;
     }
-    return { f: freqAxis, t: tAxis, Zxx: math.transpose(specMatrix), peakFreqs, peakAmps };
+    return { count: count / 2, zcPoints }; // 每两个过零点代表一个完整条纹
 }
 
-// ====================== 核心分析 ======================
 function analyzeData(values, time, params) {
-    const { fs, minFreq, maxFreq, windowSize, overlap, fringeCoeff } = params;
-    const n = values.length;
-    if (n < windowSize * 2) throw new Error(`数据长度(${n})不足，建议至少${windowSize * 2}个点`);
-
-    // 平滑窗口与最高频率联动：平滑截止频率应远高于 maxFreq
-    // 移动平均截止约 fs/(2*win)，要求 fs/(2*win) > 3*maxFreq → win < fs/(6*maxFreq)
-    let smoothWin = Math.floor(fs / (6 * maxFreq));
-    smoothWin = Math.max(3, Math.min(smoothWin, 51));
-    if (smoothWin % 2 === 0) smoothWin += 1;
-
-    const smoothed = smoothData(values, smoothWin);
-    const meanVal = smoothed.reduce((a, b) => a + b, 0) / n;
-    const centered = smoothed.map(v => v - meanVal);
-    const stdVal = Math.sqrt(centered.reduce((a, b) => a + b * b, 0) / n) || 1;
-    const normalized = centered.map(v => v / stdVal); // 自适应归一化，非硬编码×5
-
-    const noverlap = Math.floor(windowSize * overlap);
-    const stftRes = stftTransform(normalized, fs, windowSize, noverlap, minFreq, maxFreq);
-    const { t, peakFreqs, peakAmps } = stftRes;
-
-    // 鲁棒过滤：局部连续性 + 加权
-    const validIdx = [];
-    const weights = [];
-    const stageDuration = (windowSize - noverlap) / fs;
-    const medFreq = math.median(peakFreqs.filter(f => f > 0));
-    const stdFreq = math.std(peakFreqs.filter(f => f > 0)) || 1;
-
-    for (let i = 0; i < peakFreqs.length; i++) {
-        const f = peakFreqs[i];
-        if (f <= 0) continue;
-        // 全局中值±3σ作为粗筛
-        if (Math.abs(f - medFreq) > 3 * stdFreq) continue;
-        // 局部连续性：与前后窗口均值偏差不超过30%
-        const neighbors = [];
-        for (let j = Math.max(0, i - 2); j <= Math.min(peakFreqs.length - 1, i + 2); j++) {
-            if (j !== i && peakFreqs[j] > 0) neighbors.push(peakFreqs[j]);
-        }
-        if (neighbors.length >= 2) {
-            const localMean = neighbors.reduce((a, b) => a + b, 0) / neighbors.length;
-            if (Math.abs(f - localMean) / localMean > 0.3) continue;
-        }
-        validIdx.push(i);
-        // 权重 = 峰值锐度（峰值/邻域均值），越锐利越可信
-        const amp = peakAmps[i];
-        const neighborAmps = [];
-        for (let j = Math.max(0, i - 2); j <= Math.min(peakAmps.length - 1, i + 2); j++) {
-            if (j !== i) neighborAmps.push(peakAmps[j]);
-        }
-        const nbMean = neighborAmps.length ? neighborAmps.reduce((a, b) => a + b, 0) / neighborAmps.length : 1;
-        const sharpness = nbMean > 1e-9 ? Math.min(amp / nbMean, 3) : 1;
-        weights.push(sharpness);
-    }
-
-    if (validIdx.length === 0) throw new Error("无有效窗口，请调整频率范围或窗口参数");
-
-    // 加权周期累加
-    let totalCycles = 0;
-    let totalWeight = 0;
-    for (let k = 0; k < validIdx.length; k++) {
-        totalCycles += peakFreqs[validIdx[k]] * stageDuration * weights[k];
-        totalWeight += weights[k];
-    }
-    const meanFreq = totalWeight > 0 ? totalCycles / (validIdx.length * stageDuration) : 0;
-    const fringeCount = Math.round(totalCycles * fringeCoeff * 100) / 100;
-
-    // 累积条纹数序列（用于可视化）
+    const { fs, minFreq, maxFreq, threshRatio, fringeCoeff } = params;
+    
+    // 1. 带通滤波
+    const filtered = bandpassFilter(values, fs, minFreq, maxFreq);
+    
+    // 2. 过零计数
+    const zcRes = countFringesByZeroCrossing(filtered, fs, threshRatio);
+    
+    // 3. 修正与应用
+    const fringeCount = Math.round(zcRes.count * fringeCoeff * 100) / 100;
+    const duration = values.length / fs;
+    const estFreq = fringeCount / duration;
+    
+    // 4. 计算累积条纹数组（用于绘图）
     const cumCycles = [];
-    let cum = 0;
-    for (let k = 0; k < validIdx.length; k++) {
-        cum += peakFreqs[validIdx[k]] * stageDuration * weights[k] * fringeCoeff;
-        cumCycles.push(cum);
+    let currentCount = 0;
+    let zcIdx = 0;
+    for (let i = 0; i < values.length; i++) {
+        while (zcIdx < zcRes.zcPoints.length && zcRes.zcPoints[zcIdx].x <= i) {
+            currentCount += 0.5; // 每过一次零点，累积0.5个条纹
+            zcIdx++;
+        }
+        // 降采样存储以优化性能
+        if (i % 10 === 0) cumCycles.push({ x: i / fs, y: currentCount * fringeCoeff });
     }
 
-    // 有效分析时间
-    const validTime = validIdx.length * stageDuration;
-    const totalTime = n / fs;
-    const validTimeRatio = totalTime > 0 ? validTime / totalTime : 0;
-    const discardRatio = 1 - validIdx.length / peakFreqs.length;
-
-    return {
-        fringeCount, normalized, peakFreqs, peakAmps, validIdx, weights,
-        t, stageDuration, meanFreq, cumCycles, validTimeRatio, discardRatio,
-        smoothWin, stftRes, totalCyclesRaw: totalCycles / fringeCoeff
-    };
+    return { fringeCount, filtered, zcPoints: zcRes.zcPoints, estFreq, cumCycles };
 }
 
-function calcWavelength(dispMm, fringeCount) {
-    if (fringeCount <= 0) return { err: "条纹数必须大于0" };
-    if (dispMm <= 0) return { err: "位移必须大于0" };
-    const dM = dispMm / 1000;
-    const waveM = (2 * dM) / fringeCount;
-    return { waveM, waveNm: waveM * 1e9, err: null };
-}
-
-// ====================== 图表 ======================
-function drawCharts(res, fs) {
+// ====================== 绘图 ======================
+function drawCharts(res, rawValues, fs) {
     Object.values(charts).forEach(c => c && c.destroy());
+    const timeAxis = rawValues.map((_, i) => (i / fs).toFixed(3));
 
-    const timeAxis = res.normalized.map((_, i) => (i / fs).toFixed(3));
+    // Chart 1: 原始 vs 滤波
     const ctx1 = document.getElementById("chart1").getContext("2d");
     charts.c1 = new Chart(ctx1, {
         type: "line",
         data: {
             labels: timeAxis,
-            datasets: [{
-                label: `归一化光强（平滑窗${res.smoothWin}点）`,
-                data: res.normalized,
-                borderColor: "#06b6d4",
-                pointRadius: 0,
-                borderWidth: 1.5,
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: {
-                title: { display: true, text: "归一化光强时间序列", color: "#e2e8f0", font: { size: 15 } },
-                legend: { labels: { color: "#cbd5e1" } }
-            },
-            scales: {
-                x: { title: { display: true, text: "时间 (s)", color: "#cbd5e1" }, ticks: { color: "#94a3b8", maxTicksLimit: 10 }, grid: { color: "rgba(148,163,184,0.1)" } },
-                y: { title: { display: true, text: "归一化幅度", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } }
-            }
-        }
-    });
-
-        // STFT时频振幅图（取有效频段）
-    const { f, t, Zxx } = res.stftRes;
-    // 复用分析时传入的参数范围（这里写死只是为了演示补全，实际应传参或从全局读，建议你后续把minFreq/maxFreq传进来）
-    const freqMask = f.map(fr => fr >= 0.1 && fr <= 5.0); 
-    const validF = f.filter((_, i) => freqMask[i]);
-    const validZxx = Zxx.filter((_, i) => freqMask[i]);
-    const datasets2 = validF.map((freq, idx) => ({
-        label: `${freq.toFixed(2)}Hz`,
-        data: validZxx[idx],
-        borderWidth: 1,
-        pointRadius: 0,
-        tension: 0.1,
-        borderColor: idx % 2 ? "rgba(96, 165, 250, 0.6)" : "rgba(34, 211, 238, 0.6)"
-    }));
-
-    const ctx2 = document.getElementById("chart2").getContext("2d");
-    charts.c2 = new Chart(ctx2, {
-        type: "line",
-        data: { labels: t, datasets: datasets2 },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: {
-                title: { display: true, text: "STFT时频振幅曲线（有效频段）", color: "#e2e8f0", font: { size: 15 } },
-                legend: { display: false }
-            },
-            scales: {
-                x: { title: { display: true, text: "时间 (s)", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } },
-                y: { title: { display: true, text: "振幅", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } }
-            }
-        }
-    });
-
-    // 分窗口主峰频率图
-    const ctx3 = document.getElementById("chart3").getContext("2d");
-    const validFreqsForPlot = res.validIdx.map(idx => res.peakFreqs[idx]);
-    const meanF = res.meanFreq;
-    
-    // 画中值线和 ±2σ 带
-    const medF = math.median(validFreqsForPlot);
-    const stdF = math.std(validFreqsForPlot) || 1;
-
-    charts.c3 = new Chart(ctx3, {
-        type: "line",
-        data: {
-            labels: res.validIdx.map((_, i) => i),
             datasets: [
-                {
-                    label: "有效窗口主峰频率",
-                    data: validFreqsForPlot,
-                    borderColor: "#3b82f6",
-                    pointRadius: 0,
-                    tension: 0.1,
-                    borderWidth: 1.5
-                },
-                {
-                    label: `加权平均频率 ${meanF.toFixed(3)}Hz`,
-                    data: validFreqsForPlot.map(() => meanF),
-                    borderColor: "#ff8a3d",
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    borderWidth: 1.5
-                },
-                {
-                    label: `中值±2σ 边界`,
-                    data: validFreqsForPlot.map(() => medF + 2 * stdF),
-                    borderColor: "rgba(245, 158, 11, 0.4)",
-                    borderDash: [3, 3],
-                    pointRadius: 0,
-                    borderWidth: 1,
-                    fill: false
-                },
-                {
-                    label: "",
-                    data: validFreqsForPlot.map(() => Math.max(0, medF - 2 * stdF)),
-                    borderColor: "rgba(245, 158, 11, 0.4)",
-                    borderDash: [3, 3],
-                    pointRadius: 0,
-                    borderWidth: 1,
-                    fill: false
-                }
+                { label: "原始光强 (基线漂移)", data: rawValues, borderColor: "rgba(148, 163, 184, 0.4)", borderWidth: 1, pointRadius: 0, tension: 0.1 },
+                { label: "带通滤波后 (纯条纹信号)", data: res.filtered, borderColor: "#06b6d4", borderWidth: 1.5, pointRadius: 0, tension: 0 }
             ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: {
-                title: { display: true, text: "分窗口主峰频率（过滤后）", color: "#e2e8f0", font: { size: 15 } },
-                legend: { labels: { color: "#cbd5e1", boxWidth: 12 } }
-            },
+            plugins: { title: { display: true, text: "滤波前后信号对比", color: "#e2e8f0" }, legend: { labels: { color: "#cbd5e1" } } },
             scales: {
-                x: { title: { display: true, text: "有效窗口序号", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } },
-                y: { title: { display: true, text: "频率 Hz", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } }
+                x: { title: { display: true, text: "时间 (s)", color: "#cbd5e1" }, ticks: { color: "#94a3b8", maxTicksLimit: 10 }, grid: { color: "rgba(148,163,184,0.1)" } },
+                y: { title: { display: true, text: "幅度", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } }
             }
         }
     });
 
-    // 累积条纹数图（新增）
-    const ctx4 = document.getElementById("chart4").getContext("2d");
-    charts.c4 = new Chart(ctx4, {
-        type: "line",
+    // Chart 2: 过零点检测 (截取前 1000 个点展示局部)
+    const sampleLimit = Math.min(1000, rawValues.length);
+    const ctx2 = document.getElementById("chart2").getContext("2d");
+    const sampleZc = res.zcPoints.filter(p => p.x < sampleLimit).map(p => ({ x: p.x / fs, y: 0 }));
+    charts.c2 = new Chart(ctx2, {
+        type: "scatter",
         data: {
-            labels: res.validIdx.map((_, i) => (res.t[res.validIdx[i]] || 0).toFixed(3)),
-            datasets: [{
-                label: "累积条纹数 (修正后)",
-                data: res.cumCycles,
-                borderColor: "#10b981",
-                borderWidth: 2,
-                pointRadius: 0,
-                tension: 0,
-                fill: true,
-                backgroundColor: "rgba(16, 185, 129, 0.1)"
-            }]
+            datasets: [
+                { label: "滤波信号", data: res.filtered.slice(0, sampleLimit).map((v, i) => ({x: i/fs, y: v})), borderColor: "#3b82f6", showLine: true, pointRadius: 0, borderWidth: 1.5 },
+                { label: "过零点(半周期)", data: sampleZc, backgroundColor: "#ef4444", pointRadius: 3 }
+            ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: {
-                title: { display: true, text: "累积条纹数随时间变化", color: "#e2e8f0", font: { size: 15 } },
-                legend: { labels: { color: "#cbd5e1" } }
-            },
+            plugins: { title: { display: true, text: "局部过零点检测 (前1000点)", color: "#e2e8f0" }, legend: { labels: { color: "#cbd5e1" } } },
+            scales: {
+                x: { type: "linear", title: { display: true, text: "时间 (s)", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } },
+                y: { title: { display: true, text: "幅度", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } }
+            }
+        }
+    });
+
+    // Chart 3: 累积条纹数
+    const ctx3 = document.getElementById("chart3").getContext("2d");
+    charts.c3 = new Chart(ctx3, {
+        type: "line",
+        data: {
+            labels: res.cumCycles.map(p => p.x.toFixed(2)),
+            datasets: [{ label: "累积条纹数 N", data: res.cumCycles.map(p => p.y), borderColor: "#10b981", borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: "rgba(16, 185, 129, 0.1)" }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { title: { display: true, text: "累积条纹数随时间变化", color: "#e2e8f0" }, legend: { labels: { color: "#cbd5e1" } } },
             scales: {
                 x: { title: { display: true, text: "时间 (s)", color: "#cbd5e1" }, ticks: { color: "#94a3b8", maxTicksLimit: 10 }, grid: { color: "rgba(148,163,184,0.1)" } },
                 y: { title: { display: true, text: "累积条纹数", color: "#cbd5e1" }, ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } }
@@ -705,7 +374,7 @@ function drawCharts(res, fs) {
     });
 }
 
-// ====================== 文件上传与列选择 ======================
+// ====================== 事件绑定 ======================
 document.getElementById("fileInput").addEventListener("change", function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -713,151 +382,63 @@ document.getElementById("fileInput").addEventListener("change", function(e) {
     reader.onload = ev => {
         try {
             const parsed = parseFile(ev.target.result, file.name);
+            if (parsed.values.length === 0) throw new Error("未找到有效数据");
             rawData = parsed;
             
-            // 自动寻找列
-            const autoIdx = findColumnIndex(rawData.headers);
+            const fsEst = estimateSamplingRate(rawData.time);
+            const fsInput = document.getElementById("samplingRate");
+            if (fsEst) fsInput.value = fsEst.toFixed(2);
             
-            if (autoIdx !== -1) {
-                currentColumnIndex = autoIdx;
-                extractAndPrompt(rawData.allRows, rawData.headers, currentColumnIndex);
-            } else {
-                // 找不到就展示下拉框让用户选
-                document.getElementById("columnSelectWrap").classList.remove("hidden");
-                const sel = document.getElementById("columnSelect");
-                sel.innerHTML = "";
-                rawData.headers.forEach((h, i) => {
-                    const opt = document.createElement("option");
-                    opt.value = i;
-                    opt.text = h;
-                    sel.appendChild(opt);
-                });
-                sel.onchange = () => {
-                    currentColumnIndex = Number(sel.value);
-                    extractAndPrompt(rawData.allRows, rawData.headers, currentColumnIndex);
-                };
-                currentColumnIndex = 0; // 默认选第一列
-                extractAndPrompt(rawData.allRows, rawData.headers, currentColumnIndex);
-            }
-        } catch(err) {
-            alert("文件解析失败：" + err.message);
-        }
+            document.getElementById("fileInfo").innerHTML = 
+                `已加载: ${parsed.values.length} 个点 | 自动采样率: <b>${fsEst ? fsEst.toFixed(2) : '未知'} Hz</b>`;
+            
+            // 清空旧结果
+            document.getElementById("fringeCount").innerText = "--";
+            document.getElementById("waveM").innerText = "--";
+            document.getElementById("waveNm").innerText = "--";
+            document.getElementById("errMsg").innerText = "";
+            document.getElementById("warnMsg").innerText = "";
+            Object.values(charts).forEach(c => c && c.destroy());
+        } catch(err) { alert("解析失败：" + err.message); }
     };
     reader.readAsText(file);
 });
 
-function extractAndPrompt(rows, headers, valueColIdx) {
-    const { time, values } = extractDataFromRows(rows, headers, valueColIdx);
-    rawData.time = time;
-    rawData.values = values;
-    
-    // 自动估算采样率
-    const fsEstimate = estimateSamplingRate(time);
-    const fsInput = document.getElementById("samplingRate");
-    if (fsEstimate) {
-        fsInput.value = fsEstimate.toFixed(2);
-        fsInput.placeholder = `自动检测: ${fsEstimate.toFixed(2)} Hz`;
-    } else {
-        fsInput.value = "";
-        fsInput.placeholder = "自动检测失败，请手填";
-    }
-
-    document.getElementById("fileInfo").innerHTML = 
-        `已加载: ${values.length} 个光强数据点 | 列名: <b>${headers[valueColIdx]}</b> | ` +
-        (fsEstimate ? `自动采样率: <b>${fsEstimate.toFixed(2)} Hz</b>` : `<span class="text-amber-400">采样率自动检测失败</span>`);
-    
-    // 清空旧结果
-    document.getElementById("fringeCount").innerText = "--";
-    document.getElementById("waveM").innerText = "--";
-    document.getElementById("waveNm").innerText = "--";
-    document.getElementById("errMsg").innerText = "";
-    document.getElementById("warnMsg").innerText = "";
-    Object.values(charts).forEach(c => c && c.destroy());
-    charts = { c1: null, c2: null, c3: null, c4: null };
-}
-
-function toggleCalibrationHelp() {
-    const el = document.getElementById("calibrationHelp");
-    el.classList.toggle("hidden");
-}
-
-// ====================== 一键分析入口 ======================
 function runFullAnalysis() {
     const errDom = document.getElementById("errMsg");
-    const warnDom = document.getElementById("warnMsg");
     errDom.innerText = "";
-    warnDom.innerText = "";
     try {
-        if (rawData.values.length === 0) throw new Error("请先上传数据文件！");
+        if (rawData.values.length === 0) throw new Error("请先上传数据");
         
-        // 解析参数
-        const fsInput = Number(document.getElementById("samplingRate").value);
+        const fs = Number(document.getElementById("samplingRate").value);
         const minFreq = Number(document.getElementById("minFreq").value);
         const maxFreq = Number(document.getElementById("maxFreq").value);
-        const windowSize = Number(document.getElementById("winSize").value);
-        const overlap = Number(document.getElementById("overlap").value);
+        const threshRatio = Number(document.getElementById("thresholdCoeff").value);
         const fringeCoeff = Number(document.getElementById("fringeCoeff").value);
         const dispMm = Number(document.getElementById("displacement").value);
 
-        // 校验
-        if (!fsInput || fsInput <= 0) throw new Error("请输入合法的采样率，或等待自动检测");
-        if (minFreq < 0 || maxFreq <= minFreq) throw new Error("最大频率必须大于最小频率");
-        if (!Number.isInteger(Math.log2(windowSize))) throw new Error("STFT窗口必须是2的整数次幂 (64/128/256/512)");
-        if (overlap < 0 || overlap >= 1) throw new Error("重叠率必须在 [0, 1) 之间");
-        if (isNaN(dispMm) || dispMm <= 0) throw new Error("请输入合法的动镜位移 (mm)");
-        if (fringeCoeff <= 0) throw new Error("修正系数必须大于0");
+        if (!fs || fs <= 0) throw new Error("采样率无效");
+        if (maxFreq <= minFreq) throw new Error("最大频率必须大于最小频率");
+        if (isNaN(dispMm) || dispMm <= 0) throw new Error("请输入合法的位移 (mm)");
 
-        // 校验采样率与自动检测是否一致
-        const fsAuto = estimateSamplingRate(rawData.time);
-        if (fsAuto && Math.abs(fsAuto - fsInput) / fsAuto > 0.01) {
-            warnDom.innerText += `警告：手动采样率(${fsInput.toFixed(2)})与自动检测(${fsAuto.toFixed(2)})偏差超过1%，建议核对。`;
-        }
-
-        // 校验平滑截止频率与条纹频率的关系
-        const smoothWin = Math.max(3, Math.min(Math.floor(fsInput / (6 * maxFreq)), 51));
-        if (fsInput / (2 * (smoothWin % 2 === 0 ? smoothWin + 1 : smoothWin)) < 2 * maxFreq) {
-            warnDom.innerText += " 警告：平滑截止频率接近最高条纹频率，可能削弱信号。建议降低 max_freq 或减小平滑窗口。";
-        }
-
-        const params = { fs: fsInput, minFreq, maxFreq, windowSize, overlap, fringeCoeff };
+        const params = { fs, minFreq, maxFreq, threshRatio, fringeCoeff };
         const res = analyzeData(rawData.values, rawData.time, params);
         
-        // 更新 UI
         document.getElementById("fringeCount").innerText = res.fringeCount;
-        const waveRes = calcWavelength(dispMm, res.fringeCount);
-        if (waveRes.err) {
-            errDom.innerText = waveRes.err;
-            document.getElementById("waveM").innerText = "--";
-            document.getElementById("waveNm").innerText = "--";
-        } else {
-            document.getElementById("waveM").innerText = waveRes.waveM.toExponential(4);
-            document.getElementById("waveNm").innerText = waveRes.waveNm.toFixed(2);
-        }
-        document.getElementById("actualFs").innerText = fsInput.toFixed(2);
-        document.getElementById("validTimeRatio").innerText = (res.validTimeRatio * 100).toFixed(2) + "%";
-        document.getElementById("discardRatio").innerText = (res.discardRatio * 100).toFixed(2) + "%";
+        document.getElementById("actualFs").innerText = fs.toFixed(2);
+        document.getElementById("estFreq").innerText = res.estFreq.toFixed(3);
+        
+        const dM = dispMm / 1000;
+        const waveM = (2 * dM) / res.fringeCount;
+        document.getElementById("waveM").innerText = waveM.toExponential(4);
+        document.getElementById("waveNm").innerText = (waveM * 1e9).toFixed(2);
 
-        drawCharts(res, fsInput);
-    } catch (err) {
-        errDom.innerText = "错误：" + err.message;
+        drawCharts(res, rawData.values, fs);
+    } catch(err) {
+        errDom.innerText = "分析错误：" + err.message;
         Object.values(charts).forEach(c => c && c.destroy());
     }
 }
-
-// 页面加载完成后初始化图表容器
-window.addEventListener('load', () => {
-    // 防止首次未分析时 canvas 报错
-    ['chart1', 'chart2', 'chart3', 'chart4'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            const ctx = el.getContext('2d');
-            ctx.font = '16px sans-serif';
-            ctx.fillStyle = '#475569';
-            ctx.textAlign = 'center';
-            ctx.fillText('等待数据上传并执行分析...', el.width / 2, el.height / 2);
-        }
-    });
-});
 </script>
 </body>
 </html>
